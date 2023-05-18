@@ -46,9 +46,14 @@ def create_output(solution):
             file.write(f"{alphabet[i]} {solution[i]}\n")
 
 
-def measure_fitness():
+def measure_fitness(solution):
     # idea: encode the text with the current permutation, the more words found in the dict, the higher the fitness.
-    pass
+    text = decode_text(solution)
+    # find all words from dictionary in the text and give score accordingly
+    # calculate frequencies of letters
+    # calculate frequencies of pairs of letters
+    # measure loss between known frequencies and apply to score
+    return score
 
 
 def crossover(p1, p2):
