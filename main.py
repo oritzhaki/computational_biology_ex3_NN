@@ -72,16 +72,18 @@ def load_encrypted_text():
 
 
 def decode_text(permutation_vector):
-    decoded_text = ''
-    for char in encrypted_text:
-        if char in alphabet:
-            index = np.where(alphabet == char)[0][0]  # Find the index of the character in the alphabet
-            encoded_char = permutation_vector[index]  # Get the corresponding character from the permutation vector
-            decoded_text += encoded_char
-        else:
-            decoded_text += char  # Preserve non-alphabetic characters as is
-    return decoded_text
-
+    # decoded_text = ''
+    # for char in encrypted_text:
+    #     if char in alphabet:
+    #         index = np.where(alphabet == char)[0][0]  # Find the index of the character in the alphabet
+    #         encoded_char = permutation_vector[index]  # Get the corresponding character from the permutation vector
+    #         decoded_text += encoded_char
+    #     else:
+    #         decoded_text += char  # Preserve non-alphabetic characters as is
+    # return decoded_text
+    temp_dict = dict(zip(alphabet, permutation_vector))
+    decrypted_text = encrypted_text.translate(str.maketrans(temp_dict))
+    return decrypted_text
 
 def create_output(solution):
     # encode text and save in correct file
@@ -253,15 +255,15 @@ def run_ga(problem, params):
         # Store Best Cost
         bestcost[it] = bestsol.fitness  # need?
 
-        # check if bestcost doesn't change in the last x iteration
-        if bestcost[it - 1] == bestcost[it]:
-            should_break += 1
-        else:
-            should_break = 0
-
-        ### check if best solution hasn't changed in a long time and if so exit
-        if should_break == 5:
-            break
+        # # check if bestcost doesn't change in the last x iteration
+        # if bestcost[it - 1] == bestcost[it]:
+        #     should_break += 1
+        # else:
+        #     should_break = 0
+        #
+        # ### check if best solution hasn't changed in a long time and if so exit
+        # if should_break == 20:
+        #     break
 
     return bestsol.sequence
 
@@ -280,8 +282,8 @@ if __name__ == '__main__':
 
     # describe algorithm hyperparameters
     params = structure()
-    params.maxit = 50  # number of iterations
-    params.npop = 400  # size of population
+    params.maxit = 100  # number of iterations
+    params.npop = 500  # size of population
     params.beta = 1  # not sure we need
     params.pc = 1  # ratio of offspring:original population (how many offspring to be created each iteration)
     params.mu = 0.1  # percentage of vector to receive mutation
