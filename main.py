@@ -212,6 +212,8 @@ def run_ga(problem, params):
 
     # Best Cost of each iteration
     bestcost = np.empty(maxit)  # need?
+    bestseq = np.empty(maxit)
+
     should_break = 0  # counter to check if got best sequence already
     # Main Loop
     for it in range(maxit):
@@ -220,7 +222,9 @@ def run_ga(problem, params):
         avg_cost = np.mean(costs)
         if avg_cost != 0:
             costs = costs / avg_cost
-        probs = np.exp(-beta * costs)
+        # probs = np.exp(-beta * costs)
+        probs = np.exp(beta * costs)
+        probs /= np.sum(probs)
 
         # print(probs)
 
@@ -248,15 +252,17 @@ def run_ga(problem, params):
             popc.append(c1)
             popc.append(c2)
 
+
         # Merge, Sort and Select
         pop += popc
         pop = sorted(pop, key=lambda x: x.fitness, reverse=True)  # descending
         pop = pop[:npop]  # take the population of size npop with the best fitness
         # Store Best Cost
         bestcost[it] = bestsol.fitness  # need?
+        # bestseq[it] = bestsol.sequence
 
         # # check if bestcost doesn't change in the last x iteration
-        # if bestcost[it - 1] == bestcost[it]:
+        # if bestseq[it - 1] == bestseq[it]:
         #     should_break += 1
         # else:
         #     should_break = 0
