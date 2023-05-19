@@ -1,6 +1,7 @@
 # Or Itzhaki 209335058 and Tal Ishon
 import numpy as np
 from ypstruct import structure
+from collections import defaultdict
 
 #  Mono Alphabetic code is where each letter is swapped by another - the encoding is a permutation
 
@@ -15,17 +16,64 @@ from ypstruct import structure
 
 # Part A - genetic algorithm do decode a text (create two output files) and print the amount of steps (iterations?).
 
-alphabet = np.array(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'])
+alphabet = np.array(
+    ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w',
+     'x', 'y', 'z'])
 coded_file = "enc.txt"
 decoded_text_file = "plain.txt"
 best_solution_file = "perm.txt"
+encrypted_text = ""
+
+dictionary = None
+letter_frequencies = None
+letter_pair_frequencies = None
+
+
+# Load the dictionary file containing valid English words
+def load_dictionary(file_path):  # todo: check if need to remove "" from dictionary
+    with open(file_path, 'r') as file:
+        dictionary = set(word.strip().lower() for word in file)
+    return dictionary
+
+
+# Load the letter frequency file
+def load_letter_frequencies(file_path):
+    with open(file_path, 'r') as file:
+        letter_frequencies = defaultdict(float)
+        for line in file:
+            values = line.strip().split('\t')
+            if len(values) == 2:  # check if not empty
+                frequency, letter = values
+                letter_frequencies[letter.lower()] = float(frequency)
+            else:
+                break
+    return letter_frequencies
+
+
+# Load the letter pair frequency file
+def load_letter_pair_frequencies(file_path):
+    with open(file_path, 'r') as file:
+        letter_pair_frequencies = defaultdict(float)
+        for line in file:
+            values = line.strip().split('\t')
+            if len(values) == 2:  # check if not empty
+                frequency, letter_pair = values
+                letter_pair_frequencies[letter_pair.lower()] = float(frequency)
+            else:
+                break
+    return letter_pair_frequencies
+
+
+# Load the encrypted text file
+def load_encrypted_text():
+    with open(coded_file, 'r') as file:
+        text = file.read().lower()  # Read the text from the input file and convert to lowercase
+    return text
 
 
 def decode_text(permutation_vector):
-    with open(coded_file, 'r') as file:
-        text = file.read().lower()  # Read the text from the input file and convert to lowercase
     decoded_text = ''
-    for char in text:
+    for char in encrypted_text:
         if char in alphabet:
             index = np.where(alphabet == char)[0][0]  # Find the index of the character in the alphabet
             encoded_char = permutation_vector[index]  # Get the corresponding character from the permutation vector
@@ -37,23 +85,38 @@ def decode_text(permutation_vector):
 
 def create_output(solution):
     # encode text and save in correct file
-    text = decoded_text_file
+    decoded_text = decode_text(solution)
+
     with open(decoded_text_file, 'w') as file:
-        file.write(text)
+        file.write(decoded_text)
     # create file with the rules of the encoding
     with open(best_solution_file, 'w') as file:
         for i in range(len(alphabet)):
             file.write(f"{alphabet[i]} {solution[i]}\n")
 
 
+# Calculate the fitness score for an individual code configuration
 def measure_fitness(solution):
-    # idea: encode the text with the current permutation, the more words found in the dict, the higher the fitness.
     text = decode_text(solution)
+    fitness = 0.0
+
+    # Calculate fitness based on letter frequencies
+    for letter in text:
+        fitness += letter_frequencies[letter]
+
+    # Calculate fitness based on word occurrences in the dictionary
     # find all words from dictionary in the text and give score accordingly
-    # calculate frequencies of letters
-    # calculate frequencies of pairs of letters
-    # measure loss between known frequencies and apply to score
-    return score
+    words = text.lower().split()
+    for word in words:
+        if word in dictionary:
+            fitness += 1.0
+
+    # Calculate fitness based on letter pair frequencies
+    for i in range(len(text) - 1):
+        letter_pair = text[i:i + 2]
+        fitness += letter_pair_frequencies[letter_pair]
+
+    return fitness
 
 
 def crossover(p1, p2):
@@ -101,23 +164,24 @@ def mutate(x, mu):
     y = x.deepcopy()
     flag = np.random.rand(*x.sequence.shape) <= mu
     ind = np.argwhere(flag)
-    for i1 in ind:
-        i2 = np.random.randint(len(x.sequence))
-        y.position[i1], y.position[i2] = y.position[i2], y.position[i1]
+    if len(ind) > 0:
+        for i1 in ind:
+            i2 = np.random.randint(len(x.sequence))
+            y.sequence[i1.item()], y.sequence[i2] = y.sequence[i2], y.sequence[i1.item()]
     return y
 
 
 def roulette_wheel_selection(p):
     # get index of individual for selection based on the roulette wheel mechanism.
     c = np.cumsum(p)
-    r = sum(p)*np.random.rand()
+    r = sum(p) * np.random.rand()
     ind = np.argwhere(r <= c)
     return ind[0][0]
 
 
 def run_ga(problem, params):
     # Problem Information
-    costfunc = problem.costfunc
+    fitness_func = problem.fitness_func
 
     # Parameters
     maxit = params.maxit
@@ -140,13 +204,13 @@ def run_ga(problem, params):
     pop = empty_individual.repeat(npop)
     for i in range(npop):
         pop[i].sequence = np.random.permutation(alphabet.copy())
-        pop[i].fitness = costfunc(pop[i].sequence)
+        pop[i].fitness = fitness_func(pop[i].sequence)
         if pop[i].fitness > bestsol.fitness:
             bestsol = pop[i].deepcopy()
 
     # Best Cost of each iteration
     bestcost = np.empty(maxit)  # need?
-
+    should_break = 0  # counter to check if got best sequence already
     # Main Loop
     for it in range(maxit):
         #  create probabilities - better solutions are more likely to give offspring
@@ -171,11 +235,11 @@ def run_ga(problem, params):
             c1 = mutate(c1, mu)
             c2 = mutate(c2, mu)
 
-            c1.fitness = costfunc(c1.sequence)
+            c1.fitness = fitness_func(c1.sequence)
             if c1.fitness > bestsol.fitness:
                 bestsol = c1.deepcopy()
 
-            c2.fitness = costfunc(c2.sequence)
+            c2.fitness = fitness_func(c2.sequence)
             if c2.fitness > bestsol.fitness:
                 bestsol = c2.deepcopy()
 
@@ -184,28 +248,41 @@ def run_ga(problem, params):
 
         # Merge, Sort and Select
         pop += popc
-        pop = sorted(pop, key=lambda x: x.fitness)
-        pop = pop[0:npop]  # take the population of size npop with the best fitness
+        pop = sorted(pop, key=lambda x: x.fitness, reverse=True)  # descending
+        pop = pop[:npop]  # take the population of size npop with the best fitness
         # Store Best Cost
         bestcost[it] = bestsol.fitness  # need?
 
-        ### check if best solution hasn't changed in a long time and if so exit?
+        # check if bestcost doesn't change in the last x iteration
+        if bestcost[it - 1] == bestcost[it]:
+            should_break += 1
+        else:
+            should_break = 0
+
+        ### check if best solution hasn't changed in a long time and if so exit
+        if should_break == 5:
+            break
 
     return bestsol.sequence
 
 
 if __name__ == '__main__':
+    # global encrypted_text, dictionary, letter_frequencies, letter_pair_frequencies
+    encrypted_text = load_encrypted_text()
+    dictionary = load_dictionary('dict.txt')
+    letter_frequencies = load_letter_frequencies('Letter_Freq.txt')
+    letter_pair_frequencies = load_letter_pair_frequencies('Letter2_Freq.txt')
     # define problem: we are looking for the best vector of size 26. The best vector is the permutation of the
     # alphabet that maximizes the fitness score
     problem = structure()
-    problem.fitnessfunc = measure_fitness
+    problem.fitness_func = measure_fitness
     problem.size = 26  # letters of the alphabet
 
     # describe algorithm hyperparameters
     params = structure()
-    params.maxit = 500  # number of iterations
-    params.npop = 100  # size of population
-    params.beta = 1 #not sure we need
+    params.maxit = 50  # number of iterations
+    params.npop = 400  # size of population
+    params.beta = 1  # not sure we need
     params.pc = 1  # ratio of offspring:original population (how many offspring to be created each iteration)
     params.mu = 0.1  # percentage of vector to receive mutation
 
