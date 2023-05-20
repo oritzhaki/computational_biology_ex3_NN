@@ -1,7 +1,7 @@
-# Or Itzhaki 209335058 and Tal Ishon
+# Or Itzhaki 209335058 and Tal Ishon 315242297
 import csv
 import numpy as np
-from ypstruct import structure  # todo: check if might be a problem when run on university server
+from ypstruct import structure
 from collections import defaultdict
 
 #  Mono Alphabetic code is where each letter is swapped by another - the encoding is a permutation
@@ -27,12 +27,12 @@ dictionary = None
 letter_frequencies = None
 letter_pair_frequencies = None
 
-fitness_func_counter = 0
-break_flag = 1
+fitness_func_counter = 0  # counts how many times the fitness metrc is called
+break_flag = 1  # to check if there was an early break
 
 
 # Load the dictionary file containing valid English words
-def load_dictionary(file_path):  # todo: check if need to remove "" from dictionary
+def load_dictionary(file_path):
     with open(file_path, 'r') as file:
         dictionary = set(word.strip().lower() for word in file)
     return dictionary
@@ -73,16 +73,8 @@ def load_encrypted_text():
     return text
 
 
+# decodes the text using the permutation as the rules
 def decode_text(permutation_vector):
-    # decoded_text = ''
-    # for char in encrypted_text:
-    #     if char in alphabet:
-    #         index = np.where(alphabet == char)[0][0]  # Find the index of the character in the alphabet
-    #         encoded_char = permutation_vector[index]  # Get the corresponding character from the permutation vector
-    #         decoded_text += encoded_char
-    #     else:
-    #         decoded_text += char  # Preserve non-alphabetic characters as is
-    # return decoded_text
     temp_dict = dict(zip(alphabet, permutation_vector))
     decrypted_text = encrypted_text.translate(str.maketrans(temp_dict))
     return decrypted_text
@@ -162,7 +154,7 @@ def crossover(p1, p2):
 
 
 def mutate(x, mu):
-    # mutation = swap between two random letters
+    # mutation == swap between two random letters
     y = x.deepcopy()
     flag = np.random.rand(*x.sequence.shape) <= mu
     ind = np.argwhere(flag)
@@ -191,7 +183,6 @@ def run_ga(problem, params):
     # Parameters
     maxit = params.maxit
     npop = params.npop
-    beta = params.beta
     pc = params.pc
     nc = int(np.round(pc * npop / 2) * 2)  # amount of offsprings
     mu = params.mu
@@ -215,6 +206,7 @@ def run_ga(problem, params):
 
     # Best Cost of each iteration
     bestcost = np.empty(maxit)
+    avgcost = np.empty(maxit)
     bestseq = []
 
     should_break = 0  # counter to check if got best sequence already
@@ -225,14 +217,10 @@ def run_ga(problem, params):
         avg_cost = np.mean(costs)
         if avg_cost != 0:
             costs = costs / avg_cost
-        # probs = np.exp(-beta * costs)
-        probs = np.exp(beta * costs)
+        probs = np.exp(costs)
         probs /= np.sum(probs)
 
-        # print(probs)
-
-        #  print iteration:
-        print(f"Generation: {it}")
+        avgcost[it] = avg_cost
 
         popc = []  # offspring population
         for _ in range(nc // 2):  # creation of offsprings
@@ -274,7 +262,7 @@ def run_ga(problem, params):
             break_flag = 0
             break
 
-    return bestsol.sequence, bestcost
+    return bestsol.sequence, bestcost, avgcost
 
 
 if __name__ == '__main__':
@@ -293,14 +281,13 @@ if __name__ == '__main__':
     params = structure()
     params.maxit = 100  # number of iterations
     params.npop = 500  # size of population
-    params.beta = 1  # todo: decide if needed and remove/keep
     params.pc = 2  # ratio of offspring:original population (how many offspring to be created each iteration)
     params.mu = 0.1  # percentage of vector to receive mutation
 
-    best_solution, fitness_array = run_ga(problem, params)
+    best_solution, best_fitness_array, avg_fitness_array = run_ga(problem, params)
     create_output(best_solution)
-    print(f"The number of calls to fitness function: {fitness_func_counter}")
+    print(f"The total number of calls to fitness function: {fitness_func_counter}")
     if break_flag:
         with open('spreadcount.csv', 'a', newline='') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(fitness_array)
+            writer.writerow(avg_fitness_array)
