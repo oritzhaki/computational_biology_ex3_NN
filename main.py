@@ -1,6 +1,7 @@
 # Or Itzhaki 209335058 and Tal Ishon
+import csv
 import numpy as np
-from ypstruct import structure
+from ypstruct import structure  # todo: check if might be a problem when run on university server
 from collections import defaultdict
 
 #  Mono Alphabetic code is where each letter is swapped by another - the encoding is a permutation
@@ -16,9 +17,7 @@ from collections import defaultdict
 
 # Part A - genetic algorithm do decode a text (create two output files) and print the amount of steps (iterations?).
 
-alphabet = np.array(
-    ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w',
-     'x', 'y', 'z'])
+alphabet = np.array(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'])
 coded_file = "enc.txt"
 decoded_text_file = "plain.txt"
 best_solution_file = "perm.txt"
@@ -27,6 +26,9 @@ encrypted_text = ""
 dictionary = None
 letter_frequencies = None
 letter_pair_frequencies = None
+
+fitness_func_counter = 0
+break_flag = 1
 
 
 # Load the dictionary file containing valid English words
@@ -85,10 +87,10 @@ def decode_text(permutation_vector):
     decrypted_text = encrypted_text.translate(str.maketrans(temp_dict))
     return decrypted_text
 
+
 def create_output(solution):
     # encode text and save in correct file
     decoded_text = decode_text(solution)
-
     with open(decoded_text_file, 'w') as file:
         file.write(decoded_text)
     # create file with the rules of the encoding
@@ -99,25 +101,23 @@ def create_output(solution):
 
 # Calculate the fitness score for an individual code configuration
 def measure_fitness(solution):
+    global fitness_func_counter
+    fitness_func_counter += 1
     text = decode_text(solution)
     fitness = 0.0
-
     # Calculate fitness based on letter frequencies
     for letter in text:
         fitness += letter_frequencies[letter]
-
     # Calculate fitness based on word occurrences in the dictionary
     # find all words from dictionary in the text and give score accordingly
     words = text.lower().split()
     for word in words:
         if word in dictionary:
             fitness += 1.0
-
     # Calculate fitness based on letter pair frequencies
     for i in range(len(text) - 1):
         letter_pair = text[i:i + 2]
         fitness += letter_pair_frequencies[letter_pair]
-
     return fitness
 
 
@@ -174,7 +174,9 @@ def mutate(x, mu):
 
 
 def roulette_wheel_selection(p):
-    # get index of individual for selection based on the roulette wheel mechanism.
+    # get index of individual for selection based on the roulette wheel mechanism. it works like this: c is accumulative
+    # sum of the probability each index (representing someone from the population), and r is a number from 0 to the
+    # total sum. the larger prob the person had, the more likely he is that the number will fall on him
     c = np.cumsum(p)
     r = sum(p) * np.random.rand()
     ind = np.argwhere(r <= c)
@@ -182,6 +184,7 @@ def roulette_wheel_selection(p):
 
 
 def run_ga(problem, params):
+    global break_flag, alphabet
     # Problem Information
     fitness_func = problem.fitness_func
 
@@ -211,8 +214,8 @@ def run_ga(problem, params):
             bestsol = pop[i].deepcopy()
 
     # Best Cost of each iteration
-    bestcost = np.empty(maxit)  # need?
-    bestseq = np.empty(maxit)
+    bestcost = np.empty(maxit)
+    bestseq = []
 
     should_break = 0  # counter to check if got best sequence already
     # Main Loop
@@ -252,26 +255,26 @@ def run_ga(problem, params):
             popc.append(c1)
             popc.append(c2)
 
-
         # Merge, Sort and Select
         pop += popc
         pop = sorted(pop, key=lambda x: x.fitness, reverse=True)  # descending
         pop = pop[:npop]  # take the population of size npop with the best fitness
         # Store Best Cost
-        bestcost[it] = bestsol.fitness  # need?
-        # bestseq[it] = bestsol.sequence
+        bestcost[it] = bestsol.fitness
+        bestseq.append(bestsol.sequence)
 
-        # # check if bestcost doesn't change in the last x iteration
-        # if bestseq[it - 1] == bestseq[it]:
-        #     should_break += 1
-        # else:
-        #     should_break = 0
-        #
-        # ### check if best solution hasn't changed in a long time and if so exit
-        # if should_break == 20:
-        #     break
+        # check if bestcost doesn't change in the last x iterations
+        if np.array_equal(bestseq[it - 1], bestseq[it]):
+            should_break += 1
+        else:
+            should_break = 0
 
-    return bestsol.sequence
+        # check if best solution hasn't changed in a long time and if so exit
+        if should_break == 20:
+            break_flag = 0
+            break
+
+    return bestsol.sequence, bestcost
 
 
 if __name__ == '__main__':
@@ -290,9 +293,14 @@ if __name__ == '__main__':
     params = structure()
     params.maxit = 100  # number of iterations
     params.npop = 500  # size of population
-    params.beta = 1  # not sure we need
-    params.pc = 1  # ratio of offspring:original population (how many offspring to be created each iteration)
+    params.beta = 1  # todo: decide if needed and remove/keep
+    params.pc = 2  # ratio of offspring:original population (how many offspring to be created each iteration)
     params.mu = 0.1  # percentage of vector to receive mutation
 
-    best_solution = run_ga(problem, params)
+    best_solution, fitness_array = run_ga(problem, params)
     create_output(best_solution)
+    print(f"The number of calls to fitness function: {fitness_func_counter}")
+    if break_flag:
+        with open('spreadcount.csv', 'a', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(fitness_array)
