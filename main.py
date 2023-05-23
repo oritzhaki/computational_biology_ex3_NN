@@ -109,7 +109,7 @@ def measure_fitness(solution):
     # Calculate fitness based on letter pair frequencies
     for i in range(len(text) - 1):
         letter_pair = text[i:i + 2]
-        fitness += letter_pair_frequencies[letter_pair]
+        fitness += (5 * letter_pair_frequencies[letter_pair])
     return fitness
 
 
@@ -212,12 +212,13 @@ def run_ga(problem, params):
     should_break = 0  # counter to check if got best sequence already
     # Main Loop
     for it in range(maxit):
+        print(f"Generation: {it}")
         #  create probabilities - better solutions are more likely to give offspring
         costs = np.array([x.fitness for x in pop])
         avg_cost = np.mean(costs)
         if avg_cost != 0:
             costs = costs / avg_cost
-        probs = np.exp(costs)
+        probs = np.exp(2 * costs)
         probs /= np.sum(probs)
 
         avgcost[it] = avg_cost
@@ -282,12 +283,12 @@ if __name__ == '__main__':
     params.maxit = 100  # number of iterations
     params.npop = 500  # size of population
     params.pc = 2  # ratio of offspring:original population (how many offspring to be created each iteration)
-    params.mu = 0.1  # percentage of vector to receive mutation
+    params.mu = 0.05  # percentage of vector to receive mutation
 
     best_solution, best_fitness_array, avg_fitness_array = run_ga(problem, params)
     create_output(best_solution)
     print(f"The total number of calls to fitness function: {fitness_func_counter}")
-    if break_flag:
-        with open('spreadcount.csv', 'a', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow(avg_fitness_array)
+    # if break_flag:
+    #     with open('spreadcount.csv', 'a', newline='') as csvfile:
+    #         writer = csv.writer(csvfile)
+    #         writer.writerow(avg_fitness_array)
