@@ -105,7 +105,7 @@ def measure_fitness(solution):
     words = text.lower().split()
     for word in words:
         if word in dictionary:
-            fitness += 1.0
+            fitness += 1
     # Calculate fitness based on letter pair frequencies
     for i in range(len(text) - 1):
         letter_pair = text[i:i + 2]
@@ -280,9 +280,9 @@ if __name__ == '__main__':
 
     # describe algorithm hyperparameters
     params = structure()
-    params.maxit = 100  # number of iterations
-    params.npop = 500  # size of population
-    params.pc = 2  # ratio of offspring:original population (how many offspring to be created each iteration)
+    params.maxit = 200  # number of iterations
+    params.npop = 50  # size of population
+    params.pc = 4  # ratio of offspring:original population (how many offspring to be created each iteration)
     params.mu = 0.05  # percentage of vector to receive mutation
 
     best_solution, best_fitness_array, avg_fitness_array = run_ga(problem, params)
