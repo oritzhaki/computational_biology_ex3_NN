@@ -109,7 +109,7 @@ def measure_fitness(solution):
     # Calculate fitness based on letter pair frequencies
     for i in range(len(text) - 1):
         letter_pair = text[i:i + 2]
-        fitness += (6 * letter_pair_frequencies[letter_pair])
+        fitness += (5 * letter_pair_frequencies[letter_pair])
     return fitness
 
 
