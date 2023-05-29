@@ -5,6 +5,8 @@ if the fitness is higher, change the old fitness to this fitness and change the 
 and moves on to next generation.
 """
 import csv
+import time
+
 import numpy as np
 from ypstruct import structure
 from collections import defaultdict
@@ -98,8 +100,8 @@ def create_output(solution):
 
 # Calculate the fitness score for an individual code configuration
 def measure_fitness(solution):
-    # global fitness_func_counter
-    # fitness_func_counter += 1
+    global fitness_func_counter
+    fitness_func_counter += 1
     text = decode_text(solution)
     fitness = 0.0
     # Calculate fitness based on letter frequencies
@@ -192,7 +194,7 @@ def roulette_wheel_selection(p):
 
 
 def run_ga(problem, params):
-    global break_flag, alphabet, fitness_func_counter
+    global break_flag, alphabet
     # Problem Information
     fitness_func = problem.fitness_func
 
@@ -264,7 +266,6 @@ def run_ga(problem, params):
                 temp_optimized = children[i].deepcopy()
                 temp_optimized = mutate_again(temp_optimized, 5)  # N=5 swaps
                 temp_optimized.fitness = fitness_func(temp_optimized.sequence)
-                fitness_func_counter += 1
                 if temp_optimized.fitness > children[i].fitness:
                     # only if mutated child has better fitness - assign it
                     children[i] = temp_optimized
@@ -283,7 +284,7 @@ def run_ga(problem, params):
         pop = sorted(pop, key=lambda x: x.fitness, reverse=True)  # descending
         pop = pop[:npop]  # take the population of size npop with the best fitness
         # Store Best Cost
-        print(f"Best fitness: {bestsol.fitness}")
+        # print(f"Best fitness: {bestsol.fitness}")
         bestcost[it] = bestsol.fitness
         bestseq.append(bestsol.sequence)
 
@@ -297,6 +298,8 @@ def run_ga(problem, params):
         if should_break == 20:
             break_flag = 0
             break
+        # if it > 70:
+        #     break
 
     return bestsol.sequence, bestcost, avgcost
 
@@ -323,7 +326,13 @@ if __name__ == '__main__':
     best_solution, best_fitness_array, avg_fitness_array = run_ga(problem, params)
     create_output(best_solution)
     print(f"The number of calls to fitness function: {fitness_func_counter}")
-    # if break_flag:
+    time.sleep(10)
+    print("")
+
+    # if (len(best_fitness_array) >= 70):
     #     with open('spreadcount.csv', 'a', newline='') as csvfile:
     #         writer = csv.writer(csvfile)
-    #         writer.writerow(avg_fitness_array)
+    #         writer.writerow(best_fitness_array[:70])
+    #     with open('averagecount.csv', 'a', newline='') as csvfile:
+    #         writer = csv.writer(csvfile)
+    #         writer.writerow(avg_fitness_array[:70])
