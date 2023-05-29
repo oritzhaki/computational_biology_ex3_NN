@@ -109,7 +109,7 @@ def measure_fitness(solution):
     # Calculate fitness based on letter pair frequencies
     for i in range(len(text) - 1):
         letter_pair = text[i:i + 2]
-        fitness += (5 * letter_pair_frequencies[letter_pair])
+        fitness += (6 * letter_pair_frequencies[letter_pair])
     return fitness
 
 
@@ -249,6 +249,8 @@ def run_ga(problem, params):
         pop = sorted(pop, key=lambda x: x.fitness, reverse=True)  # descending
         pop = pop[:npop]  # take the population of size npop with the best fitness
         # Store Best Cost
+        print(f"Best fitness: {bestsol.fitness}")
+
         bestcost[it] = bestsol.fitness
         bestseq.append(bestsol.sequence)
 

@@ -169,6 +169,17 @@ def mutate(x, mu):
             y.sequence[i1.item()], y.sequence[i2] = y.sequence[i2], y.sequence[i1.item()]
     return y
 
+def mutate_again(x, num_mutations):
+    y = x.deepcopy()
+    indices = np.random.choice(len(x.sequence), num_mutations, replace=False)
+
+    for i in range(num_mutations):
+        i1 = indices[i]
+        i2 = np.random.choice(np.setdiff1d(np.arange(len(x.sequence)), i1))
+        y.sequence[i1], y.sequence[i2] = y.sequence[i2], y.sequence[i1]
+
+    return y
+
 
 def roulette_wheel_selection(p):
     # get index of individual for selection based on the roulette wheel mechanism. it works like this: c is accumulative
@@ -218,15 +229,7 @@ def run_ga(problem, params):
     # Main Loop
     for it in range(maxit):
 
-        #####added lamarckian part
-        for i in range(npop):
-            temp_optimized = pop[i].deepcopy()
-            temp_optimized = mutate(temp_optimized, 0.2)  # about N=5 swaps
-            temp_optimized.fitness = fitness_func(temp_optimized.sequence)
-            fitness_func_counter += 1
-            if temp_optimized.fitness > pop[i].fitness:
-                pop[i] = temp_optimized
-        #####
+        print(f"Generation: {it}")
 
         #  create probabilities - better solutions are more likely to give offspring
         costs = np.array([x.fitness for x in pop])
@@ -250,10 +253,25 @@ def run_ga(problem, params):
             c2 = mutate(c2, mu)
 
             c1.fitness = fitness_func(c1.sequence)
+            c2.fitness = fitness_func(c2.sequence)
+
+            children = [c1, c2]
+
+            """
+            Added Lamarckian part
+            """
+            for i, _ in enumerate(children):
+                temp_optimized = children[i].deepcopy()
+                temp_optimized = mutate_again(temp_optimized, 5)  # N=5 swaps
+                temp_optimized.fitness = fitness_func(temp_optimized.sequence)
+                fitness_func_counter += 1
+                if temp_optimized.fitness > children[i].fitness:
+                    # only if mutated child has better fitness - assign it
+                    children[i] = temp_optimized
+            """"""
+
             if c1.fitness > bestsol.fitness:
                 bestsol = c1.deepcopy()
-
-            c2.fitness = fitness_func(c2.sequence)
             if c2.fitness > bestsol.fitness:
                 bestsol = c2.deepcopy()
 
@@ -265,6 +283,7 @@ def run_ga(problem, params):
         pop = sorted(pop, key=lambda x: x.fitness, reverse=True)  # descending
         pop = pop[:npop]  # take the population of size npop with the best fitness
         # Store Best Cost
+        print(f"Best fitness: {bestsol.fitness}")
         bestcost[it] = bestsol.fitness
         bestseq.append(bestsol.sequence)
 
