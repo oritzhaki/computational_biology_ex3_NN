@@ -1,117 +1,71 @@
 # Or Itzhaki 209335058 and Tal Ishon 315242297
+
+"""
+HOW DOES IT WORK:
+
+architecture:
+- input layer size 16
+- HL1 size 64
+- HL2 size 32
+- Output size 1
+
+test, train = data[:20%], data[21%:]
+
+X_train, y_train = split(train)
+X_test, y_test = split(test)
+
+init population - each p in pop is a NN
+
+"""
+
+
 import csv
+import sys
+
 import numpy as np
 from ypstruct import structure
 from collections import defaultdict
 import time
 
-#  Mono Alphabetic code is where each letter is swapped by another - the encoding is a permutation
-
-# enc.txt is the text which needs to be encoded. The text can include: " ", ".", ",", ";", "\n" and they are to be left
-# exactly the same and are not to be switched.
-
-# In this code by using a genetic algorithm we will discover the rules of the code.
-# the rules should be outputted to perm.txt, and the decoded text to plain.txt.
-
-# useful files: dict.txt - dictionary of popular words, LetterFreq.txt - letter and its frequency,
-# Letter2Freq - two letters and their frequency together.
-
-# Part A - genetic algorithm do decode a text (create two output files) and print the amount of steps (iterations?).
-
-alphabet = np.array(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'])
-coded_file = "enc.txt"
-decoded_text_file = "plain.txt"
-best_solution_file = "perm.txt"
-encrypted_text = ""
-
-dictionary = None
-letter_frequencies = None
-letter_pair_frequencies = None
 
 fitness_func_counter = 0  # counts how many times the fitness metrc is called
-break_flag = 1  # to check if there was an early break
 
 
-# Load the dictionary file containing valid English words
-def load_dictionary(file_path):
-    with open(file_path, 'r') as file:
-        dictionary = set(word.strip().lower() for word in file)
-    return dictionary
+def sigmoid(inpt):
+    return 1.0 / (1.0 + np.exp(-1 * inpt))
 
+def relu(inpt):
+    result = inpt
+    result[inpt < 0] = 0
+    return result
 
-# Load the letter frequency file
-def load_letter_frequencies(file_path):
-    with open(file_path, 'r') as file:
-        letter_frequencies = defaultdict(float)
-        for line in file:
-            values = line.strip().split('\t')
-            if len(values) == 2:  # check if not empty
-                frequency, letter = values
-                letter_frequencies[letter.lower()] = float(frequency)
-            else:
-                break
-    return letter_frequencies
-
-
-# Load the letter pair frequency file
-def load_letter_pair_frequencies(file_path):
-    with open(file_path, 'r') as file:
-        letter_pair_frequencies = defaultdict(float)
-        for line in file:
-            values = line.strip().split('\t')
-            if len(values) == 2:  # check if not empty
-                frequency, letter_pair = values
-                letter_pair_frequencies[letter_pair.lower()] = float(frequency)
-            else:
-                break
-    return letter_pair_frequencies
-
-
-# Load the encrypted text file
-def load_encrypted_text():
-    with open(coded_file, 'r') as file:
-        text = file.read().lower()  # Read the text from the input file and convert to lowercase
-    return text
-
-
-# decodes the text using the permutation as the rules
-def decode_text(permutation_vector):
-    temp_dict = dict(zip(alphabet, permutation_vector))
-    decrypted_text = encrypted_text.translate(str.maketrans(temp_dict))
-    return decrypted_text
-
-
-def create_output(solution):
-    # encode text and save in correct file
-    decoded_text = decode_text(solution)
-    with open(decoded_text_file, 'w') as file:
-        file.write(decoded_text)
-    # create file with the rules of the encoding
-    with open(best_solution_file, 'w') as file:
-        for i in range(len(alphabet)):
-            file.write(f"{alphabet[i]} {solution[i]}\n")
+def predict_outputs(weights_mat, data_inputs, data_outputs, activation="relu"):
+    predictions = np.zeros(shape=(data_inputs.shape[0]))
+    for sample_idx in range(data_inputs.shape[0]):
+        r1 = data_inputs[sample_idx, :]
+        for curr_weights in weights_mat:
+            r1 = np.matmul(a=r1, b=curr_weights)
+            if activation == "relu":
+                r1 = relu(r1)
+            elif activation == "sigmoid":
+                r1 = sigmoid(r1)
+        predicted_label = np.where(r1 == np.max(r1))[0][0]
+        predictions[sample_idx] = predicted_label
+    correct_predictions = np.where(predictions == data_outputs)[0].size
+    accuracy = (correct_predictions / data_outputs.size) * 100
+    return accuracy, predictions
 
 
 # Calculate the fitness score for an individual code configuration
-def measure_fitness(solution):
+def measure_fitness(weights_mat, data_inputs, data_outputs, activation="relu"):
     global fitness_func_counter
     fitness_func_counter += 1
-    text = decode_text(solution)
-    fitness = 0.0
-    # Calculate fitness based on letter frequencies
-    for letter in text:
-        fitness += letter_frequencies[letter]
-    # Calculate fitness based on word occurrences in the dictionary
-    # find all words from dictionary in the text and give score accordingly
-    words = text.lower().split()
-    for word in words:
-        if word in dictionary:
-            fitness += 1
-    # Calculate fitness based on letter pair frequencies
-    for i in range(len(text) - 1):
-        letter_pair = text[i:i + 2]
-        fitness += (5 * letter_pair_frequencies[letter_pair])
-    return fitness
+    accuracy = np.empty(shape=(weights_mat.shape[0]))
+    for sol_idx in range(weights_mat.shape[0]):
+        curr_sol_mat = weights_mat[sol_idx, :]
+        accuracy[sol_idx], _ = predict_outputs(curr_sol_mat, data_inputs, data_outputs, activation=activation)
+    return accuracy
+
 
 
 def crossover(p1, p2):
@@ -177,7 +131,6 @@ def roulette_wheel_selection(p):
 
 
 def run_ga(problem, params):
-    global break_flag, alphabet
     # Problem Information
     fitness_func = problem.fitness_func
 
@@ -272,11 +225,9 @@ def run_ga(problem, params):
 
 
 if __name__ == '__main__':
+    sys.argv
     # global encrypted_text, dictionary, letter_frequencies, letter_pair_frequencies
-    encrypted_text = load_encrypted_text()
-    dictionary = load_dictionary('dict.txt')
-    letter_frequencies = load_letter_frequencies('Letter_Freq.txt')
-    letter_pair_frequencies = load_letter_pair_frequencies('Letter2_Freq.txt')
+
     # define problem: we are looking for the best vector of size 26. The best vector is the permutation of the
     # alphabet that maximizes the fitness score
     problem = structure()
@@ -291,7 +242,6 @@ if __name__ == '__main__':
     params.mu = 0.05  # percentage of vector to receive mutation
 
     best_solution, best_fitness_array, avg_fitness_array = run_ga(problem, params)
-    create_output(best_solution)
     print(f"The total number of calls to fitness function: {fitness_func_counter}")
 
     time.sleep(10)
