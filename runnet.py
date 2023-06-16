@@ -65,4 +65,4 @@ def main(wnet, data):
 
 if __name__ == "__main__":
     args = sys.argv
-    main(args[0], args[1])
+    main(args[1], args[2])
