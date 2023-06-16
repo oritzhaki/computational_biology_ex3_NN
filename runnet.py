@@ -10,9 +10,9 @@ class NN:
         self.init_matrices(params)
 
     def init_matrices(self, params):
-        self.W1 = reshape(params[0], params[1])
-        self.W2 = reshape(params[2], params[3])
-        self.W2 = reshape(params[4], params[5])
+        self.W1 = params[0]
+        self.W2 = params[1]
+        self.W2 = params[2]
 
     def sigmoid(self, z):
         return 1.0 / (1.0 + np.exp(-z))
@@ -30,11 +30,6 @@ class NN:
         return A3
 
 
-def reshape(vector, shape):
-    array = np.array(vector)
-    return array.reshape(shape[0], shape[1])
-
-
 def read_file(wnet):
     """
     File 'wnet' contains in lines:
@@ -45,14 +40,17 @@ def read_file(wnet):
     lines[4]: weights W3
     lines[5]: shape: (HL2, output)
     """
-    f = open(wnet, "r")
-    lines = f.readlines()
+    # Read the matrices from the file
+    loaded_data = np.loadtxt(wnet, delimiter=',')
 
-    return lines[0], lines[1], lines[2], lines[3], lines[4], lines[5]
+    # Unpack the loaded data into separate matrices
+    loaded_mat1, loaded_mat2, loaded_mat3 = loaded_data
 
+    return loaded_mat1, loaded_mat2, loaded_mat3  # return tuple of all 3 matrices
 
 def write_to_file(prediction):
     f = open("output.txt", "w")
+    # todo: make sure predictions are written into file s.t each pred is in a new line
     f.write(prediction)
     f.close()
 
@@ -60,6 +58,7 @@ def write_to_file(prediction):
 def main(wnet, data):
     params = read_file(wnet)
     NN_model = NN(params)
+    # todo: check if needs to loop over data or do it all at once - for predictions
     prediction = NN_model.feedforward(data)
     write_to_file(prediction)
 

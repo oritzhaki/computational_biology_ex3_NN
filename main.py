@@ -18,7 +18,6 @@ init population - each p in pop is a NN
 
 """
 
-
 import csv
 import sys
 
@@ -27,47 +26,80 @@ from ypstruct import structure
 from collections import defaultdict
 import time
 
-
 fitness_func_counter = 0  # counts how many times the fitness metrc is called
+X_train, X_test, y_train, y_test = None, None, None, None
+
+INPUT_SIZE = 16
+HL1 = 64
+HL2 = 32
+OUTPUT_SIZE = 1
 
 
-def sigmoid(inpt):
-    return 1.0 / (1.0 + np.exp(-1 * inpt))
+class NN:
+    def __init__(self):
+        self.W1 = None
+        self.W2 = None
+        self.W3 = None
 
-def relu(inpt):
-    result = inpt
-    result[inpt < 0] = 0
-    return result
+    def update(self, matrices):
+        self.W1 = matrices[0]
+        self.W2 = matrices[1]
+        self.W2 = matrices[2]
 
-def predict_outputs(weights_mat, data_inputs, data_outputs, activation="relu"):
-    predictions = np.zeros(shape=(data_inputs.shape[0]))
-    for sample_idx in range(data_inputs.shape[0]):
-        r1 = data_inputs[sample_idx, :]
-        for curr_weights in weights_mat:
-            r1 = np.matmul(a=r1, b=curr_weights)
-            if activation == "relu":
-                r1 = relu(r1)
-            elif activation == "sigmoid":
-                r1 = sigmoid(r1)
-        predicted_label = np.where(r1 == np.max(r1))[0][0]
-        predictions[sample_idx] = predicted_label
-    correct_predictions = np.where(predictions == data_outputs)[0].size
-    accuracy = (correct_predictions / data_outputs.size) * 100
-    return accuracy, predictions
+    def sigmoid(self, z):
+        return 1.0 / (1.0 + np.exp(-z))
+
+    def relu(self, z):
+        return np.maximum(0, z)
+
+    def feedforward(self, X):
+        Z1 = np.dot(X, self.W1)
+        A1 = self.relu(Z1)
+        Z2 = np.dot(A1, self.W2)
+        A2 = self.relu(Z2)
+        Z3 = np.dot(A2, self.W3)
+        A3 = self.sigmoid(Z3)
+        return A3
+
+
+neuralNet = NN()
+
+
+def reshape(vector, shape):
+    array = np.array(vector)
+    return array.reshape(shape[0], shape[1])
+
+
+def vec_to_matrix(vec):
+    """
+    Split the vector into 3 matrices
+    """
+    vector = vec.copy()
+    matrices = [np.reshape(vector[:INPUT_SIZE * HL1], (INPUT_SIZE, HL1)),
+                np.reshape(vector[INPUT_SIZE * HL1:INPUT_SIZE * HL1 + HL1 * HL2], (HL1, HL2)),
+                np.reshape(vector[INPUT_SIZE * HL1 + HL1 * HL2:], (HL2, OUTPUT_SIZE))]
+    return matrices
 
 
 # Calculate the fitness score for an individual code configuration
-def measure_fitness(weights_mat, data_inputs, data_outputs, activation="relu"):
+def measure_fitness(vector):
     global fitness_func_counter
     fitness_func_counter += 1
-    accuracy = np.empty(shape=(weights_mat.shape[0]))
-    for sol_idx in range(weights_mat.shape[0]):
-        curr_sol_mat = weights_mat[sol_idx, :]
-        accuracy[sol_idx], _ = predict_outputs(curr_sol_mat, data_inputs, data_outputs, activation=activation)
+
+    matrices = vec_to_matrix(vector)  # matrices: [mat1, mat2, mat3]
+    neuralNet.update(matrices)
+
+    predictions = np.zeros(shape=(X_train.shape[0]))
+    for sample_idx in range(X_train.shape[0]):
+        r1 = X_train[sample_idx, :]
+        y_hat = neuralNet.feedforward(r1)
+        predictions[sample_idx] = round(y_hat)
+    correct_predictions = np.where(predictions == y_train)[0].size
+    accuracy = (correct_predictions / y_train.size) * 100
     return accuracy
 
 
-
+# todo: edit crossover to be numerical and not letter permutation sensitive
 def crossover(p1, p2):
     # Generate random crossover points
     point1 = np.random.randint(1, len(p1.sequence))
@@ -108,6 +140,7 @@ def crossover(p1, p2):
     return c1, c2
 
 
+# todo: edit mutate to be numerical and not letter permutation sensitive
 def mutate(x, mu):
     # mutation == swap between two random letters
     y = x.deepcopy()
@@ -172,7 +205,7 @@ def run_ga(problem, params):
         avg_cost = np.mean(costs)
         if avg_cost != 0:
             costs = costs / avg_cost
-        probs = np.exp(2 * costs)
+        probs = np.exp(2 * costs)  # todo: play with hyper param for the exp
         probs /= np.sum(probs)
 
         avgcost[it] = avg_cost
@@ -224,15 +257,42 @@ def run_ga(problem, params):
     return bestsol.sequence, bestcost, avgcost
 
 
-if __name__ == '__main__':
-    sys.argv
-    # global encrypted_text, dictionary, letter_frequencies, letter_pair_frequencies
+def load_data(path):
+    f = open(path, "r")
+    lines = f.readlines()
 
-    # define problem: we are looking for the best vector of size 26. The best vector is the permutation of the
-    # alphabet that maximizes the fitness score
+    X, y = [], []
+
+    for line in lines:
+        values = line.rstrip('\n').split("  ")
+        X.append(values[0])
+        y.append(values[1])
+
+    size = len(lines)
+    size_train = int(size * 0.8)
+    return X[:size_train], X[size_train:], y[:size_train], y[size_train:]
+
+
+def write_best_sol_to_file(best_sol):
+    matrices = vec_to_matrix(best_sol)
+    # Save the matrices to a file named "matrices.txt"
+    np.savetxt("wnet.txt", (matrices[0], matrices[1], matrices[2]), delimiter=',')
+
+
+if __name__ == '__main__':
+    args = sys.argv
+
+    # todo: make sure if input is one file that we need to split. If so - the following code is suitable here
+    X_train, X_test, y_train, y_test = load_data(args[1])
+
+    X_train = np.array(X_train).reshape(-1, 16)
+    X_test = np.array(X_test).reshape(-1, 16)
+    y_train = np.array(y_train).reshape(-1, 16)
+    y_test = np.array(y_test).reshape(-1, 16)
+
     problem = structure()
     problem.fitness_func = measure_fitness
-    problem.size = 26  # letters of the alphabet
+    problem.size = 3104  # 16*64 + 64*32 + 32
 
     # describe algorithm hyperparameters
     params = structure()
@@ -242,10 +302,10 @@ if __name__ == '__main__':
     params.mu = 0.05  # percentage of vector to receive mutation
 
     best_solution, best_fitness_array, avg_fitness_array = run_ga(problem, params)
-    print(f"The total number of calls to fitness function: {fitness_func_counter}")
 
-    time.sleep(10)
-    print("")
+    write_best_sol_to_file(best_solution)
+
+    print(f"The total number of calls to fitness function: {fitness_func_counter}")
 
     # if (len(best_fitness_array) >= 70):
     #     with open('spreadcount.csv', 'a', newline='') as csvfile:
