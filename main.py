@@ -29,6 +29,7 @@ import time
 fitness_func_counter = 0  # counts how many times the fitness metrc is called
 X_train, X_test, y_train, y_test = None, None, None, None
 
+VEC_SIZE = 3104
 INPUT_SIZE = 16
 HL1 = 64
 HL2 = 32
@@ -186,7 +187,9 @@ def run_ga(problem, params):
     # Initialize Population
     pop = empty_individual.repeat(npop)
     for i in range(npop):
-        pop[i].sequence = np.random.permutation(alphabet.copy())
+        # initialize vector for each model in pop
+        pop[i].sequence = np.random.uniform(low=-0.1, high=0.1,
+                                            size=(X_train.shape[1], VEC_SIZE))
         pop[i].fitness = fitness_func(pop[i].sequence)
         if pop[i].fitness > bestsol.fitness:
             bestsol = pop[i].deepcopy()
