@@ -29,10 +29,10 @@ import time
 fitness_func_counter = 0  # counts how many times the fitness metrc is called
 X_train, X_test, y_train, y_test = None, None, None, None
 
-VEC_SIZE = 3104
+VEC_SIZE = 1040
 INPUT_SIZE = 16
-HL1 = 64
-HL2 = 32
+HL1 = 32
+HL2 = 16
 OUTPUT_SIZE = 1
 
 
@@ -54,13 +54,6 @@ class NN:
         return np.maximum(0, z)
 
     def feedforward(self, X):
-        # print(X.shape)
-        # print(self.W1.shape)
-        # print(self.W2.shape)
-        # print(self.W3.shape)
-        # X is shape (16,)
-        # W1 is shape (16, 64)
-        # W2 is shape (32, 1)
         Z1 = np.dot(X, self.W1)
         A1 = self.relu(Z1)
         Z2 = np.dot(A1, self.W2)
@@ -267,9 +260,18 @@ def load_data(path):
 
 
 def write_best_sol_to_file(best_sol):
+    # print(best_sol)
+    # print("--------------------")
     matrices = vec_to_matrix(best_sol)
-    # Save the matrices to a file named "matrices.txt"
-    np.savetxt("wnet.txt", (matrices[0], matrices[1], matrices[2]), delimiter=',')
+    matrix1_string = np.array_str(matrices[0])
+    matrix2_string = np.array_str(matrices[1])
+    matrix3_string = np.array_str(matrices[2])
+    with open('matrices.txt', 'w') as file:
+        file.write(matrix1_string + '\n')
+        file.write(matrix2_string + '\n')
+        file.write(matrix3_string + '\n')
+    file.close()
+
 
 
 if __name__ == '__main__':
@@ -285,19 +287,19 @@ if __name__ == '__main__':
 
     problem = structure()
     problem.fitness_func = measure_fitness
-    problem.size = 3104  # 16*64 + 64*32 + 32
+    problem.size = VEC_SIZE  # 16*64 + 64*32 + 32
 
     # describe algorithm hyperparameters
     params = structure()
     params.maxit = 100  # number of iterations
     params.npop = 50  # size of population
     params.pc = 2  # ratio of offspring:original population (how many offspring to be created each iteration)
-    params.mu = 0.5  # percentage of vector to receive mutation
+    params.mu = 0.4  # percentage of vector to receive mutation
     params.sigma = 1  # todo: find good sigma (size of mutation)
 
     best_solution, best_fitness_array, avg_fitness_array = run_ga(problem, params)
-    best_sol_matrices = vec_to_matrix(best_solution)
-    write_best_sol_to_file(best_sol_matrices)
+    # best_sol_matrices = vec_to_matrix(best_solution)
+    write_best_sol_to_file(best_solution)
 
     # print(f"The total number of calls to fitness function: {fitness_func_counter}")
 
