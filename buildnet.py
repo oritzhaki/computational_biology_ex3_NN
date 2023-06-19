@@ -253,25 +253,17 @@ def load_data(path):
         y.append(values[1])
 
     size = len(lines)
-    size_train = int(size * 0.8)   # todo: need to round number?
+    size_train = int(size * 0.8) 
     X = np.array([list(map(int, string)) for string in X])
     y = np.array(y).astype(int)
     return X[:size_train], X[size_train:], y[:size_train], y[size_train:]
 
 
 def write_best_sol_to_file(best_sol):
-    # print(best_sol)
-    # print("--------------------")
     matrices = vec_to_matrix(best_sol)
-    matrix1_string = np.array_str(matrices[0])
-    matrix2_string = np.array_str(matrices[1])
-    matrix3_string = np.array_str(matrices[2])
-    with open('matrices.txt', 'w') as file:
-        file.write(matrix1_string + '\n')
-        file.write(matrix2_string + '\n')
-        file.write(matrix3_string + '\n')
-    file.close()
 
+    # Save the matrices to a file named "matrices.txt"
+    np.savetxt("wnet.txt", (matrices[0], matrices[1], matrices[2]), delimiter=',')
 
 
 if __name__ == '__main__':
@@ -279,11 +271,6 @@ if __name__ == '__main__':
 
     # todo: make sure if input is one file that we need to split. If so - the following code is suitable here
     X_train, X_test, y_train, y_test = load_data(args[1])
-
-    # X_train = np.array(X_train).reshape(-1, 16)
-    # X_test = np.array(X_test).reshape(-1, 16)
-    # y_train = np.array(y_train).reshape(-1, 16)
-    # y_test = np.array(y_test).reshape(-1, 16)
 
     problem = structure()
     problem.fitness_func = measure_fitness
@@ -298,15 +285,6 @@ if __name__ == '__main__':
     params.sigma = 1  # todo: find good sigma (size of mutation)
 
     best_solution, best_fitness_array, avg_fitness_array = run_ga(problem, params)
-    # best_sol_matrices = vec_to_matrix(best_solution)
     write_best_sol_to_file(best_solution)
 
-    # print(f"The total number of calls to fitness function: {fitness_func_counter}")
 
-    # if (len(best_fitness_array) >= 70):
-    #     with open('spreadcount.csv', 'a', newline='') as csvfile:
-    #         writer = csv.writer(csvfile)
-    #         writer.writerow(best_fitness_array[:70])
-    #     with open('averagecount.csv', 'a', newline='') as csvfile:
-    #         writer = csv.writer(csvfile)
-    #         writer.writerow(avg_fitness_array[:70])
