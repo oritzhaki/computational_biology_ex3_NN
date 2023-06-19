@@ -12,7 +12,10 @@ class NN:
     def init_matrices(self, params):
         self.W1 = params[0]
         self.W2 = params[1]
-        self.W2 = params[2]
+        self.W3 = params[2]
+        print(self.W1.shape)
+        print(self.W2.shape)
+        print(self.W3.shape)
 
     def sigmoid(self, z):
         return 1.0 / (1.0 + np.exp(-z))
@@ -40,13 +43,16 @@ def read_file(wnet):
     lines[4]: weights W3
     lines[5]: shape: (HL2, output)
     """
-    # Read the matrices from the file
-    loaded_data = np.loadtxt(wnet, delimiter=',')
-
-    # Unpack the loaded data into separate matrices
-    loaded_mat1, loaded_mat2, loaded_mat3 = loaded_data
-
-    return loaded_mat1, loaded_mat2, loaded_mat3  # return tuple of all 3 matrices
+    with open(wnet, 'r') as file:
+        # Read the contents of the file
+        file_contents = file.readlines()
+    matrices = []
+    for line in file_contents:
+        matrix_string = line.strip()  # Remove any leading or trailing whitespace
+        matrix = np.fromstring(matrix_string, sep=' ')
+        matrices.append(matrix)
+    file.close()
+    return matrices
 
 def write_to_file(prediction):
     f = open("output.txt", "w")
@@ -57,6 +63,8 @@ def write_to_file(prediction):
 
 def main(wnet, data):
     params = read_file(wnet)
+    print(params)
+    # print(params.shape)
     NN_model = NN(params)
     # todo: check if needs to loop over data or do it all at once - for predictions
     prediction = NN_model.feedforward(data)
