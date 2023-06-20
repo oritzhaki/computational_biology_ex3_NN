@@ -1,40 +1,20 @@
 # Or Itzhaki 209335058 and Tal Ishon 315242297
-
-"""
-HOW DOES IT WORK:
-
-architecture:
-- input layer size 16
-- HL1 size 64
-- HL2 size 32
-- Output size 1
-
-test, train = data[:20%], data[21%:]
-
-X_train, y_train = split(train)
-X_test, y_test = split(test)
-
-init population - each p in pop is a NN
-
-"""
-
-import csv
 import sys
 import random
 import numpy as np
 from ypstruct import structure
-from collections import defaultdict
-import time
 
-fitness_func_counter = 0  # counts how many times the fitness metrc is called
 X_train, X_test, y_train, y_test = None, None, None, None
 
-VEC_SIZE = 1040
 INPUT_SIZE = 16
-HL1 = 32
+HL1 = 8
 HL2 = 16
 OUTPUT_SIZE = 1
+VEC_SIZE = (INPUT_SIZE*HL1) + (HL1*HL2) + (HL2*OUTPUT_SIZE)
 
+LAMARK_LIMIT = 3
+STUCK_LIMIT = 300
+breakflag = 1
 
 class NN:
     def __init__(self):
@@ -84,18 +64,18 @@ def vec_to_matrix(vec):
 
 # Calculate the fitness score for an individual code configuration
 def measure_fitness(vector):
-    global fitness_func_counter, X_train, y_train
-    fitness_func_counter += 1
+    global X_train, y_train
 
     matrices = vec_to_matrix(vector)  # matrices: [mat1, mat2, mat3]
     neuralNet.update(matrices)
 
-    predictions = np.zeros(shape=len(X_train))
-    for sample_idx in range(len(X_train)):
-        r1 = X_train[sample_idx]
-        y_hat = neuralNet.feedforward(r1)
-        predictions[sample_idx] = np.round(y_hat)
-    correct_predictions = np.where(predictions == y_train)[0].size
+    predictions = neuralNet.feedforward(X_train)
+    predictions = np.round(predictions)
+    predictions = np.squeeze(predictions)
+
+    # print(f"the number of 1's in predictions: {np.count_nonzero(predictions)}")
+    # print(f"the number of 0's in predictions: {len(predictions) - np.count_nonzero(predictions)}\n")
+    correct_predictions = np.sum(predictions == y_train)
     accuracy = (correct_predictions / len(y_train)) * 100
     return accuracy
 
@@ -139,12 +119,14 @@ def roulette_wheel_selection(p):
     c = np.cumsum(p)
     r = sum(p) * np.random.rand()
     ind = np.argwhere(r <= c)
+    # print("")
     return ind[0][0]
 
 
 def run_ga(problem, params):
     # Problem Information
     fitness_func = problem.fitness_func
+    size = problem.size
 
     # Parameters
     maxit = params.maxit
@@ -167,7 +149,8 @@ def run_ga(problem, params):
     pop = empty_individual.repeat(npop)
     for i in range(npop):
         # initialize vector for each model in pop
-        pop[i].sequence = np.random.uniform(-1, 1, problem.size)  # todo: check how is best to init the models (-0.1-0.1, 1-10,...)
+        # pop[i].sequence = np.random.uniform(-0.5, 0.5, problem.size)  # todo: check how is best to init the models (-0.1-0.1, 1-10,...)
+        pop[i].sequence = np.random.randn(size) * np.sqrt(1 / size)
         pop[i].fitness = fitness_func(pop[i].sequence)
         if pop[i].fitness > bestsol.fitness:
             bestsol = pop[i].deepcopy()
@@ -178,6 +161,7 @@ def run_ga(problem, params):
     bestseq = []
 
     should_break = 0  # counter to check if got best sequence already
+    lamarckian_count = 0
 
     # Main Loop
     for it in range(maxit):
@@ -194,6 +178,17 @@ def run_ga(problem, params):
 
         popc = []  # offspring population
         for _ in range(nc // 2):  # creation of offsprings
+            #check if stuck on same best sol until lamarckian limit:
+            if lamarckian_count == LAMARK_LIMIT:
+                lamarckian_count = 0
+                print("lamarckian")
+                for i, p in enumerate(pop):
+                    p_temp = p.deepcopy()
+                    p_temp = mutate(p_temp, 0.5, sigma)
+                    p_temp.fitness = fitness_func(p_temp.sequence)
+                    if p_temp.fitness > p.fitness:
+                        pop[i] = p_temp
+
             # choose two parents according to probs
             p1 = pop[roulette_wheel_selection(probs)]
             p2 = pop[roulette_wheel_selection(probs)]
@@ -222,22 +217,24 @@ def run_ga(problem, params):
         pop = pop[:npop]  # take the population of size npop with the best fitness
 
         # Store Best Cost
-        # print(f"Best fitness: {bestsol.fitness}")
+        print(f"Best fitness: {bestsol.fitness}")
         bestcost[it] = bestsol.fitness
         bestseq.append(bestsol.sequence)
 
         # check if bestcost doesn't change in the last x iterations
         if np.array_equal(bestseq[it - 1], bestseq[it]):
             should_break += 1
+            lamarckian_count += 1
         else:
             should_break = 0
+            lamarckian_count = 0
 
         # check if best solution hasn't changed in a long time and if so exit
-        if should_break == 20:
+        if (should_break == STUCK_LIMIT):
             break_flag = 0
             break
-        # if it > 70:
-        #     break
+        if (bestsol.fitness == 100):
+            break
     return bestsol.sequence, bestcost, avgcost
 
 
@@ -253,7 +250,7 @@ def load_data(path):
         y.append(values[1])
 
     size = len(lines)
-    size_train = int(size * 0.8) 
+    size_train = int(size * 0.8)
     X = np.array([list(map(int, string)) for string in X])
     y = np.array(y).astype(int)
     return X[:size_train], X[size_train:], y[:size_train], y[size_train:]
@@ -261,9 +258,12 @@ def load_data(path):
 
 def write_best_sol_to_file(best_sol):
     matrices = vec_to_matrix(best_sol)
-
-    # Save the matrices to a file named "matrices.txt"
-    np.savetxt("wnet.txt", (matrices[0], matrices[1], matrices[2]), delimiter=',')
+    # Save the matrices to a file
+    # np.savetxt("wnet.txt", (matrices[0], matrices[1], matrices[2]), delimiter=',')
+    with open("backup.txt", 'w') as file:
+        # Write the vector elements to the file
+        for element in best_sol:
+            file.write(str(element) + '\n')
 
 
 if __name__ == '__main__':
@@ -274,17 +274,26 @@ if __name__ == '__main__':
 
     problem = structure()
     problem.fitness_func = measure_fitness
-    problem.size = VEC_SIZE  # 16*64 + 64*32 + 32
+    problem.size = VEC_SIZE
 
     # describe algorithm hyperparameters
     params = structure()
-    params.maxit = 100  # number of iterations
-    params.npop = 50  # size of population
+    params.maxit = 500  # number of iterations
+    params.npop = 300  # size of population
     params.pc = 2  # ratio of offspring:original population (how many offspring to be created each iteration)
-    params.mu = 0.4  # percentage of vector to receive mutation
+    params.mu = 0.3  # percentage of vector to receive mutation
     params.sigma = 1  # todo: find good sigma (size of mutation)
 
     best_solution, best_fitness_array, avg_fitness_array = run_ga(problem, params)
-    write_best_sol_to_file(best_solution)
+    if breakflag:
+        write_best_sol_to_file(best_solution)
 
+    # print(f"The total number of calls to fitness function: {fitness_func_counter}")
 
+    # if (len(best_fitness_array) >= 70):
+    #     with open('spreadcount.csv', 'a', newline='') as csvfile:
+    #         writer = csv.writer(csvfile)
+    #         writer.writerow(best_fitness_array[:70])
+    #     with open('averagecount.csv', 'a', newline='') as csvfile:
+    #         writer = csv.writer(csvfile)
+    #         writer.writerow(avg_fitness_array[:70])

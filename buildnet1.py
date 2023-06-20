@@ -1,23 +1,4 @@
 # Or Itzhaki 209335058 and Tal Ishon 315242297
-
-"""
-HOW DOES IT WORK:
-
-architecture:
-- input layer size 16
-- HL1 size 64
-- HL2 size 32
-- Output size 1
-
-test, train = data[:20%], data[21%:]
-
-X_train, y_train = split(train)
-X_test, y_test = split(test)
-
-init population - each p in pop is a NN
-
-"""
-
 import csv
 import sys
 import random
