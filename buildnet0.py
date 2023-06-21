@@ -267,10 +267,8 @@ def write_best_sol_to_file(best_sol):
 
 
 if __name__ == '__main__':
-    args = sys.argv
-
     # todo: make sure if input is one file that we need to split. If so - the following code is suitable here
-    X_train, X_test, y_train, y_test = load_data(args[1])
+    X_train, X_test, y_train, y_test = load_data("nn0.txt")
 
     problem = structure()
     problem.fitness_func = measure_fitness
