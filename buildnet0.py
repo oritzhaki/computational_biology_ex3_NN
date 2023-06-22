@@ -1,241 +1,32 @@
-# Or Itzhaki 209335058 and Tal Ishon 315242297
-import sys
-import random
 import numpy as np
-from ypstruct import structure
+import copy
+import random
+
+####################################################
+##################### GLOBALS ######################
+####################################################
 
 X_train, X_test, y_train, y_test = None, None, None, None
 
 INPUT_SIZE = 16
-HL1 = 8
-HL2 = 16
+HL1 = 32
+HL2 = 8
 OUTPUT_SIZE = 1
-VEC_SIZE = (INPUT_SIZE*HL1) + (HL1*HL2) + (HL2*OUTPUT_SIZE)
 
-LAMARK_LIMIT = 3
-STUCK_LIMIT = 300
-breakflag = 1
+TRAIN_PERCENT = 0.8
+BEST_FITNESS_LIST = []
 
-class NN:
-    def __init__(self):
-        self.W1 = None
-        self.W2 = None
-        self.W3 = None
-
-    def update(self, matrices):
-        self.W1 = matrices[0]
-        self.W2 = matrices[1]
-        self.W3 = matrices[2]
-
-    def sigmoid(self, z):
-        return 1.0 / (1.0 + np.exp(-z))
-
-    def relu(self, z):
-        return np.maximum(0, z)
-
-    def feedforward(self, X):
-        Z1 = np.dot(X, self.W1)
-        A1 = self.relu(Z1)
-        Z2 = np.dot(A1, self.W2)
-        A2 = self.relu(Z2)
-        Z3 = np.dot(A2, self.W3)
-        A3 = self.sigmoid(Z3)
-        return A3
+POP_SIZE = 100
+MUTATION_RATE = 0.4
+GENERATIONS_LIMIT = 100
+ELITE_PERCENT = 0.05
+PERCENT_NOT_MANIPULATED = 0.2
+STUCK_THRESHOLD = 10
+TRY_BETTER_MUTATIONS = 3
+THRESHOLD = 0.6
 
 
-neuralNet = NN()
-
-
-def reshape(vector, shape):
-    array = np.array(vector)
-    return array.reshape(shape[0], shape[1])
-
-
-def vec_to_matrix(vec):
-    """
-    Split the vector into 3 matrices
-    """
-    vector = vec.copy()
-    matrices = [np.reshape(vector[:INPUT_SIZE * HL1], (INPUT_SIZE, HL1)),
-                np.reshape(vector[INPUT_SIZE * HL1:INPUT_SIZE * HL1 + HL1 * HL2], (HL1, HL2)),
-                np.reshape(vector[INPUT_SIZE * HL1 + HL1 * HL2:], (HL2, OUTPUT_SIZE))]
-    return matrices
-
-
-# Calculate the fitness score for an individual code configuration
-def measure_fitness(vector):
-    global X_train, y_train
-
-    matrices = vec_to_matrix(vector)  # matrices: [mat1, mat2, mat3]
-    neuralNet.update(matrices)
-
-    predictions = neuralNet.feedforward(X_train)
-    predictions = np.round(predictions)
-    predictions = np.squeeze(predictions)
-
-    # print(f"the number of 1's in predictions: {np.count_nonzero(predictions)}")
-    # print(f"the number of 0's in predictions: {len(predictions) - np.count_nonzero(predictions)}\n")
-    correct_predictions = np.sum(predictions == y_train)
-    accuracy = (correct_predictions / len(y_train)) * 100
-    return accuracy
-
-
-def crossover(p1, p2):
-    """
-    how it works example:
-    p1=[-0.50368893 -0.91327073 -0.39029557 -0.88672639  0.696925   -0.79873602]
-    p2=[ 0.36131945 -0.77794683 -0.80804455  0.67462618  0.73060522 -0.50873338]
-    alpha=[0, 0, 0, 0, 1, 1]
-    c1=[ 0.36131945 -0.77794683 -0.80804455  0.67462618  0.696925   -0.79873602]
-    c2=[-0.50368893 -0.91327073 -0.39029557 -0.88672639  0.73060522 -0.50873338]
-    """
-    c1 = p1.deepcopy()
-    c2 = p1.deepcopy()
-    alpha = [random.choice([0, 1]) for _ in range(len(p1.sequence))]
-    for i in range(len(p1.sequence)):
-        c1.sequence[i] = alpha[i] * p1.sequence[i] + (1 - alpha[i]) * p2.sequence[i]
-        c2.sequence[i] = (1 - alpha[i]) * p1.sequence[i] + alpha[i] * p2.sequence[i]
-    return c1, c2
-
-
-def mutate(x, mu, sigma):
-    """
-    how it works example:
-    [ 0.19814601 -0.31742422 -0.34353525  0.6856634  -0.22293646  0.16598561]
-    [False False False  True  True  True]
-    [ 0.19814601  -0.31742422  -0.34353525 -17.22924339  9.98403477   -4.0379242 ]
-    """
-    y = x.deepcopy()
-    flag = np.random.rand(*x.sequence.shape) <= mu  # creates array of T and F
-    ind = np.argwhere(flag)  # indexes of T's
-    y.sequence[ind] += sigma * np.random.randn(*ind.shape) * np.random.randn(*ind.shape)  # add the mutation
-    return y
-
-
-def roulette_wheel_selection(p):
-    # get index of individual for selection based on the roulette wheel mechanism. it works like this: c is accumulative
-    # sum of the probability each index (representing someone from the population), and r is a number from 0 to the
-    # total sum. the larger prob the person had, the more likely he is that the number will fall on him
-    c = np.cumsum(p)
-    r = sum(p) * np.random.rand()
-    ind = np.argwhere(r <= c)
-    # print("")
-    return ind[0][0]
-
-
-def run_ga(problem, params):
-    # Problem Information
-    fitness_func = problem.fitness_func
-    size = problem.size
-
-    # Parameters
-    maxit = params.maxit
-    npop = params.npop
-    pc = params.pc
-    nc = int(np.round(pc * npop / 2) * 2)  # amount of offsprings
-    mu = params.mu
-    sigma = params.sigma
-
-    # Empty Individual Template
-    empty_individual = structure()
-    empty_individual.sequence = None
-    empty_individual.fitness = None
-
-    # Best Solution Ever Found
-    bestsol = empty_individual.deepcopy()
-    bestsol.fitness = -np.inf
-
-    # Initialize Population
-    pop = empty_individual.repeat(npop)
-    for i in range(npop):
-        # initialize vector for each model in pop
-        # pop[i].sequence = np.random.uniform(-0.5, 0.5, problem.size)  # todo: check how is best to init the models (-0.1-0.1, 1-10,...)
-        pop[i].sequence = np.random.randn(size) * np.sqrt(1 / size)
-        pop[i].fitness = fitness_func(pop[i].sequence)
-        if pop[i].fitness > bestsol.fitness:
-            bestsol = pop[i].deepcopy()
-
-    # Best Cost of each iteration
-    bestcost = np.empty(maxit)
-    avgcost = np.empty(maxit)
-    bestseq = []
-
-    should_break = 0  # counter to check if got best sequence already
-    lamarckian_count = 0
-
-    # Main Loop
-    for it in range(maxit):
-        print(f"Generation: {it}")
-        #  create probabilities - better solutions are more likely to give offspring
-        costs = np.array([x.fitness for x in pop])
-        avg_cost = np.mean(costs)
-        if avg_cost != 0:
-            costs = costs / avg_cost
-        probs = np.exp(2 * costs)  # todo: play with hyper param for the exp
-        probs /= np.sum(probs)
-
-        avgcost[it] = avg_cost
-
-        popc = []  # offspring population
-        for _ in range(nc // 2):  # creation of offsprings
-            #check if stuck on same best sol until lamarckian limit:
-            if lamarckian_count == LAMARK_LIMIT:
-                lamarckian_count = 0
-                print("lamarckian")
-                for i, p in enumerate(pop):
-                    p_temp = p.deepcopy()
-                    p_temp = mutate(p_temp, 0.5, sigma)
-                    p_temp.fitness = fitness_func(p_temp.sequence)
-                    if p_temp.fitness > p.fitness:
-                        pop[i] = p_temp
-
-            # choose two parents according to probs
-            p1 = pop[roulette_wheel_selection(probs)]
-            p2 = pop[roulette_wheel_selection(probs)]
-
-            # create two offsprings from the crossover of the two parents
-            c1, c2 = crossover(p1, p2)
-
-            # mutate the offspring
-            c1 = mutate(c1, mu, sigma)
-            c2 = mutate(c2, mu, sigma)
-
-            c1.fitness = fitness_func(c1.sequence)
-            if c1.fitness > bestsol.fitness:
-                bestsol = c1.deepcopy()
-
-            c2.fitness = fitness_func(c2.sequence)
-            if c2.fitness > bestsol.fitness:
-                bestsol = c2.deepcopy()
-
-            popc.append(c1)
-            popc.append(c2)
-
-        # Merge, Sort and Select
-        pop += popc
-        pop = sorted(pop, key=lambda x: x.fitness, reverse=True)  # descending
-        pop = pop[:npop]  # take the population of size npop with the best fitness
-
-        # Store Best Cost
-        print(f"Best fitness: {bestsol.fitness}")
-        bestcost[it] = bestsol.fitness
-        bestseq.append(bestsol.sequence)
-
-        # check if bestcost doesn't change in the last x iterations
-        if np.array_equal(bestseq[it - 1], bestseq[it]):
-            should_break += 1
-            lamarckian_count += 1
-        else:
-            should_break = 0
-            lamarckian_count = 0
-
-        # check if best solution hasn't changed in a long time and if so exit
-        if (should_break == STUCK_LIMIT):
-            break_flag = 0
-            break
-        if (bestsol.fitness == 100):
-            break
-    return bestsol.sequence, bestcost, avgcost
+######################################################
 
 
 def load_data(path):
@@ -250,48 +41,276 @@ def load_data(path):
         y.append(values[1])
 
     size = len(lines)
-    size_train = int(size * 0.8)
+    size_train = int(size * TRAIN_PERCENT)
     X = np.array([list(map(int, string)) for string in X])
     y = np.array(y).astype(int)
     return X[:size_train], X[size_train:], y[:size_train], y[size_train:]
 
 
-def write_best_sol_to_file(best_sol):
-    matrices = vec_to_matrix(best_sol)
-    # Save the matrices to a file
-    # np.savetxt("wnet.txt", (matrices[0], matrices[1], matrices[2]), delimiter=',')
-    with open("backup.txt", 'w') as file:
-        # Write the vector elements to the file
-        for element in best_sol:
-            file.write(str(element) + '\n')
-
-
-if __name__ == '__main__':
-    # todo: make sure if input is one file that we need to split. If so - the following code is suitable here
+def initiate_dataset():
+    global X_train, X_test, y_train, y_test
     X_train, X_test, y_train, y_test = load_data("nn0.txt")
 
-    problem = structure()
-    problem.fitness_func = measure_fitness
-    problem.size = VEC_SIZE
 
-    # describe algorithm hyperparameters
-    params = structure()
-    params.maxit = 500  # number of iterations
-    params.npop = 300  # size of population
-    params.pc = 2  # ratio of offspring:original population (how many offspring to be created each iteration)
-    params.mu = 0.3  # percentage of vector to receive mutation
-    params.sigma = 1  # todo: find good sigma (size of mutation)
+def print_model_accuracy(y_test):
+    accuracy = calculate_net_accuracy(y_test, best_net.predict(X_test))
+    print(f"Test Accuracy: {accuracy}")
 
-    best_solution, best_fitness_array, avg_fitness_array = run_ga(problem, params)
-    if breakflag:
-        write_best_sol_to_file(best_solution)
 
-    # print(f"The total number of calls to fitness function: {fitness_func_counter}")
+def calculate_net_accuracy(y_train, predictions):
+    correct_predictions = np.sum(predictions == y_train)
+    accuracy = correct_predictions / len(y_train)
+    return float(accuracy)
 
-    # if (len(best_fitness_array) >= 70):
-    #     with open('spreadcount.csv', 'a', newline='') as csvfile:
-    #         writer = csv.writer(csvfile)
-    #         writer.writerow(best_fitness_array[:70])
-    #     with open('averagecount.csv', 'a', newline='') as csvfile:
-    #         writer = csv.writer(csvfile)
-    #         writer.writerow(avg_fitness_array[:70])
+
+def measure_fitness(network, X_train, y_train):
+    predictions = network.predict(X_train)
+    return calculate_net_accuracy(y_train, predictions)
+
+
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
+
+def relu(x):
+    return np.maximum(0, x)
+
+
+def handle_too_long_stuck(stuck, pop):
+    if stuck > 3:
+        new_pop = []
+        # performe try_better evolution on each network in the current population
+        for network in pop:
+            new_pop.append(ga.try_better(network, X_train, y_train))
+        pop = new_pop
+
+
+class GA:
+    """
+    The GA class represents an instance of a genetic algorithm (GA).
+    Genetic algorithms are search and optimization algorithms inspired by the process of natural selection and evolution.
+    The GA class encapsulates the logic and components necessary to run the GA, such as the population of individuals
+    (represented by neural network models), mutation operators, crossover operators, and fitness evaluation methods.
+    It provides an interface to initialize and execute the genetic algorithm, typically involving processes such as
+    population initialization, selection, crossover, mutation, and fitness evaluation.
+    """
+
+    def __init__(self):
+        self.POP_SIZE = POP_SIZE
+
+    def rank_selection(self, pop):
+        """
+         The rank_selection function is a function used to rank individuals in a population based on their fitness levels.
+         In the context of neural networks, each individual represents a specific neural network model.
+         The rank selection function assigns a rank or score to each individual, typically based on their performance
+         or fitness, and this ranking is used to determine their probability of selection for reproduction.
+         Individuals with higher fitness scores are assigned higher ranks and have a greater likelihood of being
+         selected for crossover and reproduction in the next generation.
+        """
+        ranked_pop = sorted(pop, key=lambda network: measure_fitness(network, X_train, y_train))
+        probs = [rank / len(ranked_pop) for rank in range(1, len(ranked_pop) + 1)]
+        parents = random.choices(ranked_pop, weights=probs, k=len(pop))
+        return parents
+
+    def run_ga(self, X_train, y_train):
+        """
+        The run_ga method runs the GA according to the global variables set in the beginning of the code.
+        """
+        # Creating an initial pop of neural networks
+        pop = []
+        global BEST_FITNESS_LIST
+        for _ in range(self.POP_SIZE):
+            network = NN(Weight(INPUT_SIZE, HL1, activation=lambda x: relu(x)),
+                         Weight(HL1, HL2, activation=lambda x: relu(x)),
+                         Weight(HL2, OUTPUT_SIZE, activation=lambda x: sigmoid(x)))
+            pop.append(network)
+
+        best_fitness = 0
+        stuck = 0
+        for generation in range(GENERATIONS_LIMIT):
+            print(f"Generation {generation}:")
+
+            # Evaluating the fitness of each network in the current pop
+            fitnesses_list = []
+            for network in pop:
+                fitness = measure_fitness(network, X_train, y_train)
+                fitnesses_list.append(fitness)
+
+            current_best_fit = max(fitnesses_list)
+            print(f"Current best fitness: {current_best_fit}")
+            BEST_FITNESS_LIST.append(current_best_fit)
+
+            # Check if the current generation has achieved maximum fitness
+            if current_best_fit == 1.0:
+                print(f"Maximum accuracy of {current_best_fit}")
+                break
+            # Check for early convergence:
+            if current_best_fit > best_fitness:
+                best_fitness = current_best_fit
+                # Reset stuck count if there's improvement
+                stuck = 0
+            else:
+                # Increment stuck count if no improvement
+                stuck += 1
+
+            if stuck >= STUCK_THRESHOLD:
+                # If no improvement for STUCK_THRESHOLD GENERATIONS_LIMIT, stop the process
+                print(f"Reachecd converge - FITNESS: {best_fitness}")
+                break
+
+            # Selecting the top performing networks (elites)
+            sorted_indices = np.argsort(fitnesses_list)[::-1]
+            elite_pop = [pop[i] for i in sorted_indices[:int(self.POP_SIZE * ELITE_PERCENT)]]
+            # Remaining pop after elites have been selected
+            remaining_pop = list(set(pop) - set(elite_pop))
+
+            # Creating offspring pop via crossover
+            offspring_pop = []
+            offsprings_len = self.POP_SIZE - len(elite_pop)
+
+            # Rank Selection
+            selected_parents = self.rank_selection(remaining_pop)
+
+            for _ in range(offsprings_len):
+                p1 = np.random.choice(selected_parents)
+                p2 = np.random.choice(elite_pop)
+                offspring = p1.crossover(p2)
+                offspring_pop.append(offspring)
+
+            # Save some offspring not_manipulated for the next gen pop
+            num_offsprings_not_manipulated = int(offsprings_len * PERCENT_NOT_MANIPULATED)
+            not_manipulated_offspring = offspring_pop[:num_offsprings_not_manipulated]
+
+            # Mutate the remaining (touched) offspring pop
+            for offspring in offspring_pop[num_offsprings_not_manipulated:]:
+                offspring.mutate()
+
+            pop = elite_pop + not_manipulated_offspring + offspring_pop[num_offsprings_not_manipulated:]
+
+            handle_too_long_stuck(stuck, pop)
+
+        fitnesses_list = [measure_fitness(network, X_train, y_train) for network in pop]
+        BEST_FITNESS_LIST.append(max(fitnesses_list))
+        best_network = pop[np.argmax(fitnesses_list)]
+        return best_network
+
+    def try_better(self, network, X_train, y_train):
+        old_fitness = measure_fitness(network, X_train, y_train)
+        temp_net = copy.deepcopy(network)
+        for _ in range(TRY_BETTER_MUTATIONS):
+            temp_net.mutate()
+
+        new_fitness = measure_fitness(temp_net, X_train, y_train)
+        if new_fitness > old_fitness:
+            return temp_net
+        else:
+            return network
+
+
+class Weight:
+    def __init__(self, input_size, output_size, activation=lambda x: sigmoid(x)):
+        self.weights = np.random.randn(input_size, output_size) * np.sqrt(2 / input_size)
+        self.activation = activation
+
+    def feedforward(self, X):
+        """
+        The feedforward method is a fundamental function used in neural networks to propagate input data through the
+        network's layers and produce an output or prediction. It takes an input signal and passes it through the network,
+        applying a series of calculations using the network's weights, biases, and activation functions.
+        The function performs forward propagation, where the input signal is processed layer by layer, and the output is
+        generated by the final layer of the network.
+        """
+        z = np.dot(X, self.weights)
+        a = self.activation(z)
+        return a
+
+    def swap(self, indices):
+        """
+        Function performs the weight swap to introduce mutation
+        """
+        temp = self.weights[indices[0]]
+        self.weights[indices[0]] = self.weights[indices[1]]
+        self.weights[indices[1]] = temp
+
+    def update_weights(self, weights):
+        self.weights = weights
+
+
+class NN:
+    """
+    The NN class is a programming construct used to represent individuals in the population of a genetic algorithm. 
+    In genetic algorithms, a population consists of multiple individuals, each of which represents a potential solution 
+    to a problem. In the context of neural networks, an individual represents a specific configuration or set of weights 
+    for a neural network.
+    """
+
+    def __init__(self, weight1, weight2, weight3):
+        # List to hold all weights of the neural network
+        self.W1 = weight1
+        self.W2 = weight2
+        self.W3 = weight3
+        self.weights = [self.W1, self.W2, self.W3]
+
+    def predict(self, inputs):
+        """
+        The predict function is used for making predictions or classifications.
+        It takes in a sample from a dataset as input and produces a predicted label or output based on the learned
+        patterns and relationships within the neural network.
+        """
+        # Passes the inputs through each layer of the network
+        outputs = inputs
+        for weight in self.weights:
+            outputs = weight.feedforward(outputs)
+        # Converts the output of the final weight to binary predictions
+        binary_predictions = (outputs > THRESHOLD).astype(int)
+        return binary_predictions.flatten()
+
+    def crossover(self, other_network):
+        """
+        The crossover method is a function that performs crossover on a NN as part of a genetic algorithm (GA).
+        In the context of GA, crossover refers to the process of combining genetic information from two parent
+        neural networks to create offspring networks with a combination of their characteristics.
+        This function typically selects certain portions or attributes of the parent networks and combines them to
+        generate new individuals that inherit traits from both parents.
+        """
+        # Create the new neural network which will be our offspring
+        network = NN(Weight(INPUT_SIZE, HL1, activation=lambda x: relu(x)),
+                     Weight(HL1, HL2, activation=lambda x: relu(x)),
+                     Weight(HL2, OUTPUT_SIZE, activation=lambda x: sigmoid(x)))
+
+        for i in range(len(self.weights)):
+            alpha = np.random.uniform(0.0, 1.0, size=self.weights[i].weights.shape)
+            network.weights[i].weights = alpha * self.weights[i].weights + \
+                                         (1 - alpha) * other_network.weights[i].weights
+        return network
+
+    def mutate(self):
+        """
+        The mutate method is a function that applies mutations to a NN as part of a genetic algorithm (GA).
+        The purpose of this function is to introduce random variations or modifications to the neural network's
+        parameters, such as weights or biases, in order to explore different regions of the solution space and
+        potentially improve the performance or adaptability of the network.
+        """
+        for weight in self.weights:
+            flag = np.random.rand(*weight.weights.shape) < MUTATION_RATE
+            mutation_indices = np.where(flag)
+            mutations_num = len(mutation_indices[0])
+
+            if mutations_num < 2:  # less than 2 - no actual mutation will accure
+                continue
+
+            # Choose two random indices for swapping weights
+            rand_indices = np.random.choice(mutations_num, size=2, replace=False)
+            swap_indices = mutation_indices[0][rand_indices]
+
+            weight.swap(swap_indices)
+
+
+if __name__ == "__main__":
+    initiate_dataset()
+
+    ga = GA()
+    best_net = ga.run_ga(X_train, y_train)
+    np.savez("wnet0", arr1=best_net.W1.weights, arr2=best_net.W2.weights, arr3=best_net.W3.weights)
+
+    print_model_accuracy(y_test)

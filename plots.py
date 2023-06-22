@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import buildnet as ga
+import temp_buildnet0 as ga
 import csv
 
 #get hyperparameters?
