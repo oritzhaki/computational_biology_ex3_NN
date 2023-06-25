@@ -1,6 +1,7 @@
 import numpy as np
 import copy
 import random
+import matplotlib.pyplot as plt
 
 ####################################################
 ##################### GLOBALS ######################
@@ -30,6 +31,7 @@ THRESHOLD = 0.6
 
 
 def load_data(path):
+    global X_train, X_test, y_train, y_test
     f = open(path, "r")
     lines = f.readlines()
 
@@ -44,44 +46,33 @@ def load_data(path):
     size_train = int(size * TRAIN_PERCENT)
     X = np.array([list(map(int, string)) for string in X])
     y = np.array(y).astype(int)
-    return X[:size_train], X[size_train:], y[:size_train], y[size_train:]
+    X_train = X[:size_train]
+    X_test = X[size_train:]
+    y_train = y[:size_train]
+    y_test = y[size_train:]
 
 
-def initiate_dataset():
-    global X_train, X_test, y_train, y_test
-    X_train, X_test, y_train, y_test = load_data("nn0.txt")
-
-
-def print_model_accuracy(y_test):
-    accuracy = calculate_net_accuracy(y_test, best_net.predict(X_test))
-    print(f"Test Accuracy: {accuracy}")
-
-
-def calculate_net_accuracy(y_train, predictions):
-    correct_predictions = np.sum(predictions == y_train)
-    accuracy = correct_predictions / len(y_train)
+def calculate_accuracy(y, predictions):
+    correct_predictions = np.sum(predictions == y)
+    accuracy = correct_predictions / len(y)
     return float(accuracy)
 
 
-def measure_fitness(network, X_train, y_train):
+def measure_fitness(network):
+    """
+    The fitness function in our GA is calculated according to the model's accuracy.
+    """
+    global X_train, y_train
     predictions = network.predict(X_train)
-    return calculate_net_accuracy(y_train, predictions)
-
-
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
-
-
-def relu(x):
-    return np.maximum(0, x)
+    return calculate_accuracy(y_train, predictions)
 
 
 def handle_too_long_stuck(stuck, pop):
     if stuck > 3:
         new_pop = []
-        # performe try_better evolution on each network in the current population
+        # perform try_better evolution on each network in the current population
         for network in pop:
-            new_pop.append(ga.try_better(network, X_train, y_train))
+            new_pop.append(ga.try_better(network))
         pop = new_pop
 
 
@@ -96,7 +87,7 @@ class GA:
     """
 
     def __init__(self):
-        self.POP_SIZE = POP_SIZE
+        self.pop_size = POP_SIZE
 
     def rank_selection(self, pop):
         """
@@ -107,22 +98,59 @@ class GA:
          Individuals with higher fitness scores are assigned higher ranks and have a greater likelihood of being
          selected for crossover and reproduction in the next generation.
         """
-        ranked_pop = sorted(pop, key=lambda network: measure_fitness(network, X_train, y_train))
+        ranked_pop = sorted(pop, key=lambda network: measure_fitness(network))
         probs = [rank / len(ranked_pop) for rank in range(1, len(ranked_pop) + 1)]
         parents = random.choices(ranked_pop, weights=probs, k=len(pop))
         return parents
 
-    def run_ga(self, X_train, y_train):
+    def crossover(self, n1, n2):
+        """
+        The crossover method is a function that performs crossover on a NN as part of a genetic algorithm (GA).
+        In the context of GA, crossover refers to the process of combining genetic information from two parent
+        neural networks to create offspring networks with a combination of their characteristics.
+        This function typically selects certain portions or attributes of the parent networks and combines them to
+        generate new individuals that inherit traits from both parents.
+        """
+        # Create the new neural network which will be our offspring
+        network = NN()
+
+        for i in range(len(n1.weights)):
+            alpha = np.random.uniform(0.0, 1.0, size=n1.weights[i].weights.shape)
+            network.weights[i].weights = alpha * n1.weights[i].weights + \
+                                         (1 - alpha) * n2.weights[i].weights
+        return network
+
+
+    def mutate(self, network):
+        """
+        The mutate method is a function that applies mutations to a NN as part of a genetic algorithm (GA).
+        The purpose of this function is to introduce random variations or modifications to the neural network's
+        parameters, such as weights or biases, in order to explore different regions of the solution space and
+        potentially improve the performance or adaptability of the network.
+        """
+        for weight in network.weights:
+            flag = np.random.rand(*weight.weights.shape) < MUTATION_RATE
+            mutation_indices = np.where(flag)
+            mutations_num = len(mutation_indices[0])
+
+            if mutations_num < 2:  # less than 2 - no actual mutation will occur
+                continue
+
+            # Choose two random indices for swapping weights
+            rand_indices = np.random.choice(mutations_num, size=2, replace=False)
+            swap_indices = mutation_indices[0][rand_indices]
+
+            weight.swap(swap_indices)
+
+    def run_ga(self):
         """
         The run_ga method runs the GA according to the global variables set in the beginning of the code.
         """
+        global X_train, y_train, BEST_FITNESS_LIST
         # Creating an initial pop of neural networks
         pop = []
-        global BEST_FITNESS_LIST
-        for _ in range(self.POP_SIZE):
-            network = NN(Weight(INPUT_SIZE, HL1, activation=lambda x: relu(x)),
-                         Weight(HL1, HL2, activation=lambda x: relu(x)),
-                         Weight(HL2, OUTPUT_SIZE, activation=lambda x: sigmoid(x)))
+        for _ in range(self.pop_size):
+            network = NN()
             pop.append(network)
 
         best_fitness = 0
@@ -131,12 +159,12 @@ class GA:
             print(f"Generation {generation}:")
 
             # Evaluating the fitness of each network in the current pop
-            fitnesses_list = []
+            fitness_list = []
             for network in pop:
-                fitness = measure_fitness(network, X_train, y_train)
-                fitnesses_list.append(fitness)
+                fitness = measure_fitness(network)
+                fitness_list.append(fitness)
 
-            current_best_fit = max(fitnesses_list)
+            current_best_fit = max(fitness_list)
             print(f"Current best fitness: {current_best_fit}")
             BEST_FITNESS_LIST.append(current_best_fit)
 
@@ -155,18 +183,18 @@ class GA:
 
             if stuck >= STUCK_THRESHOLD:
                 # If no improvement for STUCK_THRESHOLD GENERATIONS_LIMIT, stop the process
-                print(f"Reachecd converge - FITNESS: {best_fitness}")
+                print(f"Reached convergence - FITNESS: {best_fitness}")
                 break
 
             # Selecting the top performing networks (elites)
-            sorted_indices = np.argsort(fitnesses_list)[::-1]
-            elite_pop = [pop[i] for i in sorted_indices[:int(self.POP_SIZE * ELITE_PERCENT)]]
+            sorted_indices = np.argsort(fitness_list)[::-1]
+            elite_pop = [pop[i] for i in sorted_indices[:int(self.pop_size * ELITE_PERCENT)]]
             # Remaining pop after elites have been selected
             remaining_pop = list(set(pop) - set(elite_pop))
 
             # Creating offspring pop via crossover
             offspring_pop = []
-            offsprings_len = self.POP_SIZE - len(elite_pop)
+            offsprings_len = self.pop_size - len(elite_pop)
 
             # Rank Selection
             selected_parents = self.rank_selection(remaining_pop)
@@ -174,7 +202,7 @@ class GA:
             for _ in range(offsprings_len):
                 p1 = np.random.choice(selected_parents)
                 p2 = np.random.choice(elite_pop)
-                offspring = p1.crossover(p2)
+                offspring = self.crossover(p1, p2)
                 offspring_pop.append(offspring)
 
             # Save some offspring not_manipulated for the next gen pop
@@ -183,24 +211,25 @@ class GA:
 
             # Mutate the remaining (touched) offspring pop
             for offspring in offspring_pop[num_offsprings_not_manipulated:]:
-                offspring.mutate()
+                self.mutate(offspring)
 
             pop = elite_pop + not_manipulated_offspring + offspring_pop[num_offsprings_not_manipulated:]
 
             handle_too_long_stuck(stuck, pop)
 
-        fitnesses_list = [measure_fitness(network, X_train, y_train) for network in pop]
-        BEST_FITNESS_LIST.append(max(fitnesses_list))
-        best_network = pop[np.argmax(fitnesses_list)]
+        fitness_list = [measure_fitness(network) for network in pop]
+        BEST_FITNESS_LIST.append(max(fitness_list))
+        best_network = pop[np.argmax(fitness_list)]
         return best_network
 
-    def try_better(self, network, X_train, y_train):
-        old_fitness = measure_fitness(network, X_train, y_train)
+    def try_better(self, network):
+        global X_train, y_train
+        old_fitness = measure_fitness(network)
         temp_net = copy.deepcopy(network)
         for _ in range(TRY_BETTER_MUTATIONS):
-            temp_net.mutate()
+            self.mutate(temp_net)
 
-        new_fitness = measure_fitness(temp_net, X_train, y_train)
+        new_fitness = measure_fitness(temp_net)
         if new_fitness > old_fitness:
             return temp_net
         else:
@@ -208,7 +237,7 @@ class GA:
 
 
 class Weight:
-    def __init__(self, input_size, output_size, activation=lambda x: sigmoid(x)):
+    def __init__(self, input_size, output_size, activation):
         self.weights = np.random.randn(input_size, output_size) * np.sqrt(2 / input_size)
         self.activation = activation
 
@@ -244,11 +273,11 @@ class NN:
     for a neural network.
     """
 
-    def __init__(self, weight1, weight2, weight3):
+    def __init__(self):
         # List to hold all weights of the neural network
-        self.W1 = weight1
-        self.W2 = weight2
-        self.W3 = weight3
+        self.W1 = Weight(INPUT_SIZE, HL1, activation=lambda x: self.relu(x))
+        self.W2 = Weight(HL1, HL2, activation=lambda x: self.relu(x))
+        self.W3 = Weight(HL2, OUTPUT_SIZE, activation=lambda x: self.sigmoid(x))
         self.weights = [self.W1, self.W2, self.W3]
 
     def predict(self, inputs):
@@ -265,52 +294,31 @@ class NN:
         binary_predictions = (outputs > THRESHOLD).astype(int)
         return binary_predictions.flatten()
 
-    def crossover(self, other_network):
-        """
-        The crossover method is a function that performs crossover on a NN as part of a genetic algorithm (GA).
-        In the context of GA, crossover refers to the process of combining genetic information from two parent
-        neural networks to create offspring networks with a combination of their characteristics.
-        This function typically selects certain portions or attributes of the parent networks and combines them to
-        generate new individuals that inherit traits from both parents.
-        """
-        # Create the new neural network which will be our offspring
-        network = NN(Weight(INPUT_SIZE, HL1, activation=lambda x: relu(x)),
-                     Weight(HL1, HL2, activation=lambda x: relu(x)),
-                     Weight(HL2, OUTPUT_SIZE, activation=lambda x: sigmoid(x)))
+    def sigmoid(self, x):
+        return 1 / (1 + np.exp(-x))
 
-        for i in range(len(self.weights)):
-            alpha = np.random.uniform(0.0, 1.0, size=self.weights[i].weights.shape)
-            network.weights[i].weights = alpha * self.weights[i].weights + \
-                                         (1 - alpha) * other_network.weights[i].weights
-        return network
-
-    def mutate(self):
-        """
-        The mutate method is a function that applies mutations to a NN as part of a genetic algorithm (GA).
-        The purpose of this function is to introduce random variations or modifications to the neural network's
-        parameters, such as weights or biases, in order to explore different regions of the solution space and
-        potentially improve the performance or adaptability of the network.
-        """
-        for weight in self.weights:
-            flag = np.random.rand(*weight.weights.shape) < MUTATION_RATE
-            mutation_indices = np.where(flag)
-            mutations_num = len(mutation_indices[0])
-
-            if mutations_num < 2:  # less than 2 - no actual mutation will accure
-                continue
-
-            # Choose two random indices for swapping weights
-            rand_indices = np.random.choice(mutations_num, size=2, replace=False)
-            swap_indices = mutation_indices[0][rand_indices]
-
-            weight.swap(swap_indices)
+    def relu(self, x):
+        return np.maximum(0, x)
 
 
 if __name__ == "__main__":
-    initiate_dataset()
-
+    load_data("nn0.txt")
     ga = GA()
-    best_net = ga.run_ga(X_train, y_train)
-    np.savez("wnet0", arr1=best_net.W1.weights, arr2=best_net.W2.weights, arr3=best_net.W3.weights)
+    best_net = ga.run_ga()
 
-    print_model_accuracy(y_test)
+    ################ for plots ######################
+    # all = []
+    # for i in range(10):
+    #     ga = GA()
+    #     best_net = ga.run_ga(X_train, y_train)
+    #     all.append(BEST_FITNESS_LIST.copy())
+    #     BEST_FITNESS_LIST = []
+    # min_length = min(len(array) for array in all)
+    # trimmed_arrays = [array[:min_length] for array in all]
+    # avg = np.mean(trimmed_arrays, axis=0)
+    # plt.plot(avg)
+    # plt.show()
+
+    np.savez("wnet0", arr1=best_net.W1.weights, arr2=best_net.W2.weights, arr3=best_net.W3.weights)
+    model_accuracy = calculate_accuracy(y_test, best_net.predict(X_test))
+    print(f"Test Accuracy: {model_accuracy}")
