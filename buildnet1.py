@@ -67,15 +67,6 @@ def measure_fitness(network):
     return calculate_accuracy(y_train, predictions)
 
 
-def handle_too_long_stuck(stuck, pop):
-    if stuck > 3:
-        new_pop = []
-        # perform try_better evolution on each network in the current population
-        for network in pop:
-            new_pop.append(ga.try_better(network))
-        pop = new_pop
-
-
 class GA:
     """
     The GA class represents an instance of a genetic algorithm (GA).
@@ -203,7 +194,7 @@ class GA:
             for _ in range(offsprings_len):
                 p1 = np.random.choice(selected_parents)
                 p2 = np.random.choice(elite_pop)
-                offspring = p1.crossover(p2)
+                offspring = self.crossover(p1, p2)
                 offspring_pop.append(offspring)
 
             # Save some offspring not_manipulated for the next gen pop
@@ -212,29 +203,14 @@ class GA:
 
             # Mutate the remaining (touched) offspring pop
             for offspring in offspring_pop[num_offsprings_not_manipulated:]:
-                offspring.mutate()
+                self.mutate(offspring)
 
             pop = elite_pop + not_manipulated_offspring + offspring_pop[num_offsprings_not_manipulated:]
-
-            handle_too_long_stuck(stuck, pop)
 
         fitness_list = [measure_fitness(network) for network in pop]
         BEST_FITNESS_LIST.append(max(fitness_list))
         best_network = pop[np.argmax(fitness_list)]
         return best_network
-
-    def try_better(self, network):
-        global X_train, y_train
-        old_fitness = measure_fitness(network)
-        temp_net = copy.deepcopy(network)
-        for _ in range(TRY_BETTER_MUTATIONS):
-            temp_net.mutate()
-
-        new_fitness = measure_fitness(temp_net)
-        if new_fitness > old_fitness:
-            return temp_net
-        else:
-            return network
 
 
 class Weight:
