@@ -2,6 +2,7 @@ import numpy as np
 import copy
 import random
 import matplotlib.pyplot as plt
+import sys
 
 ####################################################
 ##################### GLOBALS ######################
@@ -30,27 +31,28 @@ THRESHOLD = 0.6
 ######################################################
 
 
-def load_data(path):
+def load_data(train_path, test_path):
     global X_train, X_test, y_train, y_test
-    f = open(path, "r")
-    lines = f.readlines()
+    f_train = open(train_path, "r")
+    lines_train = f_train.readlines()
+    f_test = open(test_path, "r")
+    lines_test = f_test.readlines()
+    input_train_X, input_train_y, input_test_X, input_test_y = [], [], [], []
 
-    X, y = [], []
-
-    for line in lines:
+    for line in lines_train:
         values = line.rstrip('\n').split("  ")
-        X.append(values[0])
-        y.append(values[1])
+        input_train_X.append(values[0])
+        input_train_y.append(values[1])
 
-    size = len(lines)
-    size_train = int(size * TRAIN_PERCENT)
-    X = np.array([list(map(int, string)) for string in X])
-    y = np.array(y).astype(int)
-    X_train = X[:size_train]
-    X_test = X[size_train:]
-    y_train = y[:size_train]
-    y_test = y[size_train:]
+    for line in lines_test:
+        values = line.rstrip('\n').split("  ")
+        input_test_X.append(values[0])
+        input_test_y.append(values[1])
 
+    X_train = np.array([list(map(int, string)) for string in input_train_X])
+    y_train = np.array(input_train_y).astype(int)
+    X_test = np.array([list(map(int, string)) for string in input_test_X])
+    y_test = np.array(input_test_y).astype(int)
 
 def calculate_accuracy(y, predictions):
     correct_predictions = np.sum(predictions == y)
@@ -278,7 +280,11 @@ class NN:
 
 
 if __name__ == "__main__":
-    load_data("nn0.txt")
+    args = sys.argv
+    if len(args) != 3:
+        print("Wrong amount of arguments.")
+        exit(1)
+    load_data(args[1], args[2])
     ga = GA()
     best_net = ga.run_ga()
 
