@@ -1,5 +1,5 @@
 import numpy as np
-from buildnet0 import NN, Weight, sigmoid, relu
+from buildnet0 import NN, Weight
 
 
 def load_data(filename):
@@ -18,25 +18,20 @@ def load_data(filename):
     return np.array(test)
 
 
-def get_weights_for_model(W1, W2, W3):
-    temp1 = Weight(1, 1, activation=lambda x: relu(x))
-    temp2 = Weight(1, 1, activation=lambda x: relu(x))
-    temp3 = Weight(1, 1, activation=lambda x: sigmoid(x))
-    temp1.update_weights(W1)
-    temp2.update_weights(W2)
-    temp3.update_weights(W3)
-    return temp1, temp2, temp3
-
-
 def initiate_best_model(filename):
     weights = np.load(filename)
     W1 = weights['arr1']
     W2 = weights['arr2']
     W3 = weights['arr3']
-
-    weights1, weights2, weights3 = get_weights_for_model(W1, W2, W3)
-
-    return NN(weights1, weights2, weights3)
+    network = NN()
+    temp1 = Weight(1, 1, activation=lambda x: network.relu(x))
+    temp2 = Weight(1, 1, activation=lambda x: network.relu(x))
+    temp3 = Weight(1, 1, activation=lambda x: network.sigmoid(x))
+    temp1.update_weights(W1)
+    temp2.update_weights(W2)
+    temp3.update_weights(W3)
+    network.weights = [temp1, temp2, temp3]
+    return network
 
 
 def write_predictions_to_file(filename):
