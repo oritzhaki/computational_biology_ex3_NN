@@ -1,42 +1,6 @@
 import numpy as np
-from buildnet1 import NN, Weight, sigmoid, relu
+from buildnet1 import NN, Weight
 
-
-################################ CHECK FOR US ###################################
-
-# def print_model_accuracy(X_test, y_test):
-#     accuracy = calculate_net_accuracy(y_test, BEST_MODEL.predict(X_test))
-#     print(f"Test Accuracy: {accuracy}")
-#
-#
-# def calculate_net_accuracy(y_train, predictions):
-#     correct_predictions = np.sum(predictions == y_train)
-#     accuracy = correct_predictions / len(y_train)
-#     return float(accuracy)
-#
-#
-# def measure_fitness(network, X_train, y_train):
-#     predictions = network.predict(X_train)
-#     return calculate_net_accuracy(y_train, predictions)
-#
-# def load_data_temp(path):
-#     f = open(path, "r")
-#     lines = f.readlines()
-#
-#     X, y = [], []
-#
-#     for line in lines:
-#         values = line.rstrip('\n').split("  ")
-#         X.append(values[0])
-#         y.append(values[1])
-#
-#     size = len(lines)
-#     size_train = int(size * 0.8)
-#     X = np.array([list(map(int, string)) for string in X])
-#     y = np.array(y).astype(int)
-#     return X, y
-
-###################################################################
 
 def load_data(filename):
     """
@@ -54,25 +18,20 @@ def load_data(filename):
     return np.array(test)
 
 
-def get_weights_for_model(W1, W2, W3):
-    temp1 = Weight(1, 1, activation=lambda x: relu(x))
-    temp2 = Weight(1, 1, activation=lambda x: relu(x))
-    temp3 = Weight(1, 1, activation=lambda x: sigmoid(x))
-    temp1.update_weights(W1)
-    temp2.update_weights(W2)
-    temp3.update_weights(W3)
-    return temp1, temp2, temp3
-
-
 def initiate_best_model(filename):
     weights = np.load(filename)
     W1 = weights['arr1']
     W2 = weights['arr2']
     W3 = weights['arr3']
-
-    weights1, weights2, weights3 = get_weights_for_model(W1, W2, W3)
-
-    return NN(weights1, weights2, weights3)
+    network = NN()
+    temp1 = Weight(1, 1, activation=lambda x: network.relu(x))
+    temp2 = Weight(1, 1, activation=lambda x: network.relu(x))
+    temp3 = Weight(1, 1, activation=lambda x: network.sigmoid(x))
+    temp1.update_weights(W1)
+    temp2.update_weights(W2)
+    temp3.update_weights(W3)
+    network.weights = [temp1, temp2, temp3]
+    return network
 
 
 def write_predictions_to_file(filename):
@@ -82,11 +41,8 @@ def write_predictions_to_file(filename):
 
     results.close()
 
-if __name__ == "__main__":
-    # CHECK FOR US IF IT WORKS
-    # X_test, y_test = load_data_temp("nn1_test.txt")
-    # print_model_accuracy(X_test, y_test)
 
+if __name__ == "__main__":
     # Load data from test file
     X_test = load_data("testnet1.txt")
 
