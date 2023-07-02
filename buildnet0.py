@@ -54,15 +54,6 @@ def load_data(train_path, test_path):
     X_test = np.array([list(map(int, string)) for string in input_test_X])
     y_test = np.array(input_test_y).astype(int)
 
-
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
-
-
-def relu(x):
-    return np.maximum(0, x)
-
-
 def calculate_accuracy(y, predictions):
     correct_predictions = np.sum(predictions == y)
     accuracy = correct_predictions / len(y)
@@ -121,6 +112,7 @@ class GA:
             network.weights[i].weights = alpha * n1.weights[i].weights + \
                                          (1 - alpha) * n2.weights[i].weights
         return network
+
 
     def mutate(self, network):
         """
@@ -261,9 +253,9 @@ class NN:
 
     def __init__(self):
         # List to hold all weights of the neural network
-        self.W1 = Weight(INPUT_SIZE, HL1, activation=lambda x: relu(x))
-        self.W2 = Weight(HL1, HL2, activation=lambda x: relu(x))
-        self.W3 = Weight(HL2, OUTPUT_SIZE, activation=lambda x: sigmoid(x))
+        self.W1 = Weight(INPUT_SIZE, HL1, activation=lambda x: self.relu(x))
+        self.W2 = Weight(HL1, HL2, activation=lambda x: self.relu(x))
+        self.W3 = Weight(HL2, OUTPUT_SIZE, activation=lambda x: self.sigmoid(x))
         self.weights = [self.W1, self.W2, self.W3]
 
     def predict(self, inputs):
@@ -279,6 +271,12 @@ class NN:
         # Converts the output of the final weight to binary predictions
         binary_predictions = (outputs > THRESHOLD).astype(int)
         return binary_predictions.flatten()
+
+    def sigmoid(self, x):
+        return 1 / (1 + np.exp(-x))
+
+    def relu(self, x):
+        return np.maximum(0, x)
 
 
 if __name__ == "__main__":
