@@ -1,35 +1,6 @@
 import numpy as np
 from buildnet0 import NN, Weight, sigmoid, relu
-#
-# def print_model_accuracy(X_test, y_test):
-#     accuracy = calculate_net_accuracy(y_test, BEST_MODEL.predict(X_test))
-#     print(f"Test Accuracy: {accuracy}")
-# def calculate_net_accuracy(y_train, predictions):
-#     correct_predictions = np.sum(predictions == y_train)
-#     accuracy = correct_predictions / len(y_train)
-#     return float(accuracy)
-#
-#
-# def measure_fitness(network, X_train, y_train):
-#     predictions = network.predict(X_train)
-#     return calculate_net_accuracy(y_train, predictions)
-#
-# def load_data_temp(path):
-#     f = open(path, "r")
-#     lines = f.readlines()
-#
-#     X, y = [], []
-#
-#     for line in lines:
-#         values = line.rstrip('\n').split("  ")
-#         X.append(values[0])
-#         y.append(values[1])
-#
-#     size = len(lines)
-#     size_train = int(size * 0.8)
-#     X = np.array([list(map(int, string)) for string in X])
-#     y = np.array(y).astype(int)
-#     return X, y
+
 
 def load_data(filename):
     """
@@ -75,12 +46,8 @@ def write_predictions_to_file(filename):
 
     results.close()
 
+
 if __name__ == "__main__":
-    # CHECK FOR US IF IT WORKS
-    # X_test, y_test = load_data_temp("testnet0.txt")
-    # print_model_accuracy(X_test, y_test)
-
-
     # Load data from test file
     X_test = load_data("testnet0.txt")
 
