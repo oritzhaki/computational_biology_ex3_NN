@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import copy
 import random
@@ -300,3 +302,6 @@ if __name__ == "__main__":
     np.savez("wnet0", arr1=best_net.W1.weights, arr2=best_net.W2.weights, arr3=best_net.W3.weights)
     model_accuracy = calculate_accuracy(y_test, best_net.predict(X_test))
     print(f"Test Accuracy: {model_accuracy}")
+    time.sleep(5)
+    print("END!")
+
