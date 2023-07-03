@@ -53,4 +53,4 @@ if __name__ == "__main__":
     predictions = BEST_MODEL.predict(X_test)
 
     # Write predictions to results file
-    write_predictions_to_file("result0.txt")
+    write_predictions_to_file("predictions0.txt")

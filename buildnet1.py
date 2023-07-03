@@ -281,11 +281,7 @@ class NN:
 
 
 if __name__ == "__main__":
-    args = sys.argv
-    if len(args) != 3:
-        print("Wrong amount of arguments.")
-        exit(1)
-    load_data(args[1], args[2])
+    load_data('nn1_train.txt', 'nn1_test.txt')
     ga = GA()
     best_net = ga.run_ga()
 
